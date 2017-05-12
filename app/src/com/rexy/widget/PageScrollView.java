@@ -598,7 +598,7 @@ public class PageScrollView extends ViewGroup {
             int childMarginHorizontal = params.getMarginHorizontal();
             int childMarginVertical = params.getMarginVertical();
             int childWidthSpec = childFixedWidthSpec == 0 ? getMiddleChildMeasureSpec(widthMeasureSpec, parentRealSize, childMarginHorizontal, params.width) : childFixedWidthSpec;
-            int childHeightSpec = getMiddleChildMeasureSpec(heightMeasureSpec, parentRealSize, childMarginVertical, params.height);
+            int childHeightSpec = getMiddleChildMeasureSpec(heightMeasureSpec, 0, childMarginVertical, params.height);
             child.measure(childWidthSpec, childHeightSpec);
             if (mMiddleMargin > 0 && measuredCount > 0) {
                 contentWidth += mMiddleMargin;
@@ -630,7 +630,7 @@ public class PageScrollView extends ViewGroup {
             PageScrollView.LayoutParams params = (PageScrollView.LayoutParams) child.getLayoutParams();
             int childMarginHorizontal = params.getMarginHorizontal();
             int childMarginVertical = params.getMarginVertical();
-            int childWidthSpec = getMiddleChildMeasureSpec(widthMeasureSpec, parentRealSize, childMarginHorizontal, params.width);
+            int childWidthSpec = getMiddleChildMeasureSpec(widthMeasureSpec, 0, childMarginHorizontal, params.width);
             int childHeightSpec = childFixedHeightSpec == 0 ? getMiddleChildMeasureSpec(heightMeasureSpec, parentRealSize, childMarginVertical, params.height) : childFixedHeightSpec;
             child.measure(childWidthSpec, childHeightSpec);
             if (mMiddleMargin > 0 && measuredCount > 0) {

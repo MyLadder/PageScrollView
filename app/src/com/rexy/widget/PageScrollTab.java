@@ -11,30 +11,25 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.support.v4.view.ViewPager.OnPageChangeListener;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.Transformation;
 import android.widget.Checkable;
-import android.widget.HorizontalScrollView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
-
 
 import com.rexy.pagescrollview.R;
 
 import java.util.Locale;
 
 
-public class HorizontalSlideTab extends HorizontalScrollView {
+public class PageScrollTab extends PageScrollView {
 
     public interface ITabProvider {
         CharSequence getPageTitle(int position);
@@ -51,7 +46,7 @@ public class HorizontalSlideTab extends HorizontalScrollView {
     }
 
     public interface ITabClickEvent {
-        boolean onTabClicked(HorizontalSlideTab parent, View cur, int curPos, View pre, int prePos);
+        boolean onTabClicked(PageScrollTab parent, View cur, int curPos, View pre, int prePos);
     }
 
 
@@ -61,25 +56,13 @@ public class HorizontalSlideTab extends HorizontalScrollView {
             android.R.attr.textColor};
     // @formatter:on
 
-
-    private int mTabItemCount; //tab item 数量。
-    private LinearLayout mTabContainer; //tab item 的直接容器。
-
     /**
      * 以下和
      */
     private int mCurrentPosition = 0; //当前选中的tab 索引。
     private float mCurrentPositionOffset = 0f;//选中tab 的偏移量子。
-    private int mLastScrollX = 0;
-    private int scrollOffset = 52;
 
-
-    /**
-     * 以下是设置tab item 的 LayoutParams 布局。
-     */
-    private boolean mShouldItemExpand = true;
-    private LinearLayout.LayoutParams mDefaultItemLayoutParams;
-    private LinearLayout.LayoutParams mExpandedItemLayoutParams;
+    private PageScrollView.LayoutParams mItemLayoutParams;
 
     /**
      * 以下是设置tab item 的最小padding 值。
@@ -142,7 +125,7 @@ public class HorizontalSlideTab extends HorizontalScrollView {
     //c
     private ViewPager mViewPager = null;
     private final PageListener mViewPageListener = new PageListener();
-    public OnPageChangeListener mDelegatePageListener;
+    public ViewPager.OnPageChangeListener mDelegatePageListener;
 
     protected ITabProvider mITabProvider = null;
     protected ITabClickEvent mTabClick = null;
@@ -152,7 +135,7 @@ public class HorizontalSlideTab extends HorizontalScrollView {
             Object tag = view.getTag(TAB_INDEX);
             int cur = (tag instanceof Integer) ? (Integer) tag : mCurrentPosition;
             int pre = mCurrentPosition;
-            boolean handled = mTabClick == null ? false : mTabClick.onTabClicked(HorizontalSlideTab.this, view, cur, mPreCheckView, pre);
+            boolean handled = mTabClick == null ? false : mTabClick.onTabClicked(PageScrollTab.this, view, cur, mPreCheckView, pre);
             handTabClick(cur, pre, handled);
         }
     };
@@ -171,28 +154,20 @@ public class HorizontalSlideTab extends HorizontalScrollView {
         }
     }
 
-    public HorizontalSlideTab(Context context) {
+    public PageScrollTab(Context context) {
         this(context, null);
     }
 
-    public HorizontalSlideTab(Context context, AttributeSet attrs) {
+    public PageScrollTab(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public HorizontalSlideTab(Context context, AttributeSet attrs, int defStyle) {
+    public PageScrollTab(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        setFillViewport(true);
         setWillNotDraw(false);
-
-        mTabContainer = new LinearLayout(context);
-        mTabContainer.setOrientation(LinearLayout.HORIZONTAL);
-        mTabContainer.setGravity(Gravity.CENTER_VERTICAL);
-        addView(mTabContainer);
-
+        setOrientation(HORIZONTAL);
+        setChildFillParent(true);
         DisplayMetrics dm = getResources().getDisplayMetrics();
-
-        scrollOffset = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, scrollOffset,
-                dm);
         mIndicatorHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
                 mIndicatorHeight, dm);
         mTopLineHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
@@ -217,55 +192,50 @@ public class HorizontalSlideTab extends HorizontalScrollView {
 
         // get custom attrs
 
-        a = context.obtainStyledAttributes(attrs, R.styleable.HorizontalSlideTab);
-        mItemBackground = a.getResourceId(R.styleable.HorizontalSlideTab_tabItemBackground,
+        a = context.obtainStyledAttributes(attrs, R.styleable.PageScrollTab);
+        mItemBackground = a.getResourceId(R.styleable.PageScrollTab_tabItemBackground,
                 mItemBackground);
-        mItemBackgroundFirst = a.getResourceId(R.styleable.HorizontalSlideTab_tabItemBackgroundFirst,
+        mItemBackgroundFirst = a.getResourceId(R.styleable.PageScrollTab_tabItemBackgroundFirst,
                 mItemBackgroundFirst);
-        mItemBackgroundLast = a.getResourceId(R.styleable.HorizontalSlideTab_tabItemBackgroundLast,
+        mItemBackgroundLast = a.getResourceId(R.styleable.PageScrollTab_tabItemBackgroundLast,
                 mItemBackgroundLast);
-        mItemBackgroundFull = a.getResourceId(R.styleable.HorizontalSlideTab_tabItemBackgroundFull,
+        mItemBackgroundFull = a.getResourceId(R.styleable.PageScrollTab_tabItemBackgroundFull,
                 mItemBackgroundFull);
 
 
-        mIndicatorColor = a.getColor(R.styleable.HorizontalSlideTab_tabIndicatorColor,
+        mIndicatorColor = a.getColor(R.styleable.PageScrollTab_tabIndicatorColor,
                 mIndicatorColor);
         mIndicatorHeight = a.getDimensionPixelSize(
-                R.styleable.HorizontalSlideTab_tabIndicatorHeight, mIndicatorHeight);
+                R.styleable.PageScrollTab_tabIndicatorHeight, mIndicatorHeight);
 
 
-        mTopLineColor = a.getColor(R.styleable.HorizontalSlideTab_tabTopLineColor,
+        mTopLineColor = a.getColor(R.styleable.PageScrollTab_tabTopLineColor,
                 mTopLineColor);
         mTopLineHeight = a.getDimensionPixelSize(
-                R.styleable.HorizontalSlideTab_tabTopLineHeight, mTopLineHeight);
+                R.styleable.PageScrollTab_tabTopLineHeight, mTopLineHeight);
 
-        mBottomLineColor = a.getColor(R.styleable.HorizontalSlideTab_tabBottomLineColor,
+        mBottomLineColor = a.getColor(R.styleable.PageScrollTab_tabBottomLineColor,
                 mBottomLineColor);
         mBottomLineHeight = a.getDimensionPixelSize(
-                R.styleable.HorizontalSlideTab_tabBottomLineHeight, mBottomLineHeight);
+                R.styleable.PageScrollTab_tabBottomLineHeight, mBottomLineHeight);
 
 
-        mDividerColor = a.getColor(R.styleable.HorizontalSlideTab_tabItemDividerColor, mDividerColor);
-        mDividerWidth = a.getDimensionPixelSize(R.styleable.HorizontalSlideTab_tabItemDividerWidth, mDividerWidth);
+        mDividerColor = a.getColor(R.styleable.PageScrollTab_tabItemDividerColor, mDividerColor);
+        mDividerWidth = a.getDimensionPixelSize(R.styleable.PageScrollTab_tabItemDividerWidth, mDividerWidth);
         mDividerPadding = a.getDimensionPixelSize(
-                R.styleable.HorizontalSlideTab_tabItemDividerPadding, mDividerPadding);
+                R.styleable.PageScrollTab_tabItemDividerPadding, mDividerPadding);
 
 
         mItemMinPaddingHorizonal = a.getDimensionPixelSize(
-                R.styleable.HorizontalSlideTab_tabItemMinPaddingHorizonal, mItemMinPaddingHorizonal);
+                R.styleable.PageScrollTab_tabItemMinPaddingHorizonal, mItemMinPaddingHorizonal);
         mItemMinPaddingTop = a.getDimensionPixelSize(
-                R.styleable.HorizontalSlideTab_tabItemMinPaddingTop, mItemMinPaddingHorizonal);
+                R.styleable.PageScrollTab_tabItemMinPaddingTop, mItemMinPaddingTop);
         mItemMinPaddingBottom = a.getDimensionPixelSize(
-                R.styleable.HorizontalSlideTab_tabItemMinPaddingBottom, mItemMinPaddingHorizonal);
+                R.styleable.PageScrollTab_tabItemMinPaddingBottom, mItemMinPaddingBottom);
 
-        mTextAllCaps = a.getBoolean(R.styleable.HorizontalSlideTab_tabItemTextCaps, mTextAllCaps);
-        mTextColorResId = a.getResourceId(R.styleable.HorizontalSlideTab_tabItemTextColor,
+        mTextAllCaps = a.getBoolean(R.styleable.PageScrollTab_tabItemTextCaps, mTextAllCaps);
+        mTextColorResId = a.getResourceId(R.styleable.PageScrollTab_tabItemTextColor,
                 mTextColorResId);
-        mShouldItemExpand = a
-                .getBoolean(R.styleable.HorizontalSlideTab_tabItemShouldExpand, mShouldItemExpand);
-        scrollOffset = a.getDimensionPixelSize(R.styleable.HorizontalSlideTab_tabScrollOffset,
-                scrollOffset);
-
         a.recycle();
 
         rectPaint = new Paint();
@@ -276,13 +246,11 @@ public class HorizontalSlideTab extends HorizontalScrollView {
         dividerPaint.setAntiAlias(true);
         dividerPaint.setStrokeWidth(mDividerWidth);
 
-        mDefaultItemLayoutParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT,
-                LayoutParams.MATCH_PARENT);
-        mExpandedItemLayoutParams = new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1.0f);
-
         if (mLocalInfo == null) {
             mLocalInfo = getResources().getConfiguration().locale;
         }
+        mItemLayoutParams=new PageScrollView.LayoutParams(-2,-2,Gravity.CENTER_VERTICAL);
+        setGravity(Gravity.CENTER_VERTICAL|getGravity());
     }
 
     public int getTabItemCount() {
@@ -292,11 +260,7 @@ public class HorizontalSlideTab extends HorizontalScrollView {
         if (mViewPager != null && mViewPager.getAdapter() != null) {
             return mViewPager.getAdapter().getCount();
         }
-        return 0;
-    }
-
-    public LinearLayout getTabContainer() {
-        return mTabContainer;
+        return getItemCount();
     }
 
     public ITabProvider getTabProvider() {
@@ -331,24 +295,24 @@ public class HorizontalSlideTab extends HorizontalScrollView {
         mTabClick = l;
     }
 
-    public void setOnPageChangeListener(OnPageChangeListener listener) {
+    public void setOnPageChangeListener(ViewPager.OnPageChangeListener listener) {
         this.mDelegatePageListener = listener;
     }
 
 
     public void notifyDataSetChanged() {
-        mTabContainer.removeAllViews();
-        mTabItemCount = getTabItemCount();
+        removeAllViews();
+        int tabItemCount = getTabItemCount();
         boolean accessToTabProvider = mITabProvider != null;
         boolean accessToViewPage = mViewPager != null;
-        boolean isViewTab = false;
+        boolean isViewTab;
         if (!accessToTabProvider && !accessToViewPage) {
             return;
         } else {
             isViewTab = (accessToTabProvider && mITabProvider instanceof ViewTabProvider);
         }
         LayoutInflater inflater = LayoutInflater.from(getContext());
-        for (int i = 0; i < mTabItemCount; i++) {
+        for (int i = 0; i < tabItemCount; i++) {
             if (isViewTab) {
                 addTab(i, ((ViewTabProvider) mITabProvider).getView(getContext(), inflater, i));
             } else {
@@ -369,9 +333,9 @@ public class HorizontalSlideTab extends HorizontalScrollView {
                 if (mViewPager != null) {
                     mCurrentPosition = mViewPager.getCurrentItem();
                 }
-                int n = mTabContainer.getChildCount();
+                int n = getItemCount();
                 if (mCurrentPosition >= 0 && mCurrentPosition < n) {
-                    mPreCheckView = mTabContainer.getChildAt(mCurrentPosition);
+                    mPreCheckView = getVirtualChildAt(mCurrentPosition, true);
                     if (mPreCheckView instanceof Checkable && mPreCheckView.isEnabled()) {
                         ((Checkable) mPreCheckView).setChecked(true);
                     }
@@ -402,33 +366,32 @@ public class HorizontalSlideTab extends HorizontalScrollView {
         int right = Math.max(mItemMinPaddingHorizonal, tab.getPaddingRight());
         int bottom = Math.max(mItemMinPaddingBottom, tab.getPaddingBottom());
         tab.setPadding(left, top, right, bottom);
-        mTabContainer.addView(tab, position, mShouldItemExpand ? mExpandedItemLayoutParams
-                : mDefaultItemLayoutParams);
+        addView(tab, position,mItemLayoutParams);
     }
 
     public void addTabItem(CharSequence title, boolean updateStyle) {
-        addTextTab(mTabItemCount, title);
-        mTabItemCount++;
+        addTextTab(getChildCount(), title);
         if (updateStyle) {
             updateTabStyles();
         }
     }
 
     private void updateTabStyles() {
+        int itemCount = getChildCount();
         boolean hasMutiBackground = mItemBackgroundFirst != 0 && mItemBackgroundLast != 0;
-        for (int i = 0; i < mTabItemCount; i++) {
+        for (int i = 0; i < itemCount; i++) {
             int backgroundRes = mItemBackground;
-            View v = mTabContainer.getChildAt(i);
+            View v = getChildAt(i);
             if (hasMutiBackground) {
                 if (i == 0) {
-                    if (mTabItemCount == 1) {
+                    if (itemCount == 1) {
                         if (mItemBackgroundFull != 0) {
                             backgroundRes = mItemBackgroundFull;
                         }
                     } else {
                         backgroundRes = mItemBackgroundFirst;
                     }
-                } else if (i == mTabItemCount - 1) {
+                } else if (i == itemCount - 1) {
                     backgroundRes = mItemBackgroundLast;
                 }
             }
@@ -456,92 +419,65 @@ public class HorizontalSlideTab extends HorizontalScrollView {
                 }
             }
         }
-
     }
 
     private void scrollToChild(int position, int offset, boolean anim) {
-
-        if (mTabItemCount == 0) {
-            return;
-        }
-
-        int newScrollX = mTabContainer.getChildAt(position).getLeft() + offset;
-
-        if (position > 0 || offset > 0) {
-            newScrollX -= scrollOffset;
-        }
-
-        if (newScrollX != mLastScrollX) {
-            mLastScrollX = newScrollX;
-            if (anim) {
-                smoothScrollTo(newScrollX, 0);
-            } else {
-                scrollTo(newScrollX, 0);
-            }
-        }
-
+        scrollToCentre(position, offset, anim ? -1 : 0);
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (isInEditMode() || mTabItemCount == 0) {
+        int itemCount = getTabItemCount();
+        if (isInEditMode() || itemCount == 0) {
             return;
         }
-        final int height = getHeight();
+        int width = getWidth(),height = getHeight();
+
+        // draw divider
+        if (mDividerWidth > 0) {
+            dividerPaint.setColor(mDividerColor);
+            float dividerXOffset = dividerPaint.getStrokeWidth() / 2;
+            for (int i = 0; i < itemCount - 1; i++) {
+                View tab = getVirtualChildAt(i, true);
+                float startX = tab.getRight() + dividerXOffset;
+                canvas.drawLine(startX, mDividerPadding, startX, height - mDividerPadding, dividerPaint);
+            }
+        }
+
+        // draw top or bottom line.
+        if (mBottomLineHeight > 0) {
+            rectPaint.setColor(mBottomLineColor);
+            canvas.drawRect(0, height - mBottomLineHeight, width, height, rectPaint);
+        }
+        if (mTopLineHeight > 0) {
+            rectPaint.setColor(mTopLineColor);
+            canvas.drawRect(0, 0, width, mTopLineHeight, rectPaint);
+        }
+
         // draw indicator line
         if (mIndicatorHeight > 0) {
             rectPaint.setColor(mIndicatorColor);
-
             // default: line below current tab
-            View currentTab = mTabContainer.getChildAt(mCurrentPosition);
+            View currentTab = getVirtualChildAt(mCurrentPosition, true);
             float lineLeft = currentTab.getLeft();
             float lineRight = currentTab.getRight();
-
-            // if there is an offset, start interpolating left and right coordinates
-            // between current and next tab
-            if (mCurrentPositionOffset > 0f && mCurrentPosition < mTabItemCount - 1) {
-
-                View nextTab = mTabContainer.getChildAt(mCurrentPosition + 1);
+            // if there is an offset, start interpolating left and right coordinates   between current and next tab
+            if (mCurrentPositionOffset > 0f && mCurrentPosition < itemCount - 1) {
+                View nextTab = getVirtualChildAt(mCurrentPosition + 1, true);
                 final float nextTabLeft = nextTab.getLeft();
                 final float nextTabRight = nextTab.getRight();
-
                 lineLeft = (mCurrentPositionOffset * nextTabLeft + (1f - mCurrentPositionOffset)
                         * lineLeft);
                 lineRight = (mCurrentPositionOffset * nextTabRight + (1f - mCurrentPositionOffset)
                         * lineRight);
             }
-
             canvas.drawRect(lineLeft, height - mIndicatorHeight, lineRight, height, rectPaint);
-
             // draw underline
-        }
-
-        if (mBottomLineHeight > 0) {
-            rectPaint.setColor(mBottomLineColor);
-            canvas.drawRect(0, height - mBottomLineHeight, mTabContainer.getWidth(), height, rectPaint);
-        }
-        if (mTopLineHeight > 0) {
-            rectPaint.setColor(mTopLineColor);
-            canvas.drawRect(0, 0, mTabContainer.getWidth(), mTopLineHeight, rectPaint);
-
-        }
-        // draw divider
-
-        if (mDividerWidth > 0) {
-            dividerPaint.setColor(mDividerColor);
-            float dividerWidth = dividerPaint.getStrokeWidth();
-            for (int i = 0; i < mTabItemCount - 1; i++) {
-                View tab = mTabContainer.getChildAt(i);
-                float linex = tab.getRight() + dividerWidth;
-                canvas.drawLine(linex, mDividerPadding, linex,
-                        height - mDividerPadding, dividerPaint);
-            }
         }
     }
 
-    private class PageListener implements OnPageChangeListener {
-
+    private class PageListener implements ViewPager.OnPageChangeListener {
         @Override
         public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
             callPageScrolled(position, positionOffset);
@@ -571,8 +507,7 @@ public class HorizontalSlideTab extends HorizontalScrollView {
     public void callPageScrolled(int position, float positionOffset) {
         mCurrentPosition = position;
         mCurrentPositionOffset = positionOffset;
-        scrollToChild(position, (int) (positionOffset * mTabContainer.getChildAt(position)
-                .getWidth()), false);
+        scrollToChild(position, (int) (positionOffset * getVirtualChildAt(position, true).getWidth()), false);
         invalidate();
     }
 
@@ -600,7 +535,7 @@ public class HorizontalSlideTab extends HorizontalScrollView {
             mCurrentPosition = position;
             mCurrentPositionOffset = 0;
         }
-        View v = mTabContainer.getChildAt(position);
+        View v = getVirtualChildAt(position, true);
         if (mPreCheckView == null || mPreCheckView != v) {
             if (mAutoCheckState) {
                 if (mPreCheckView instanceof Checkable) {
@@ -619,8 +554,9 @@ public class HorizontalSlideTab extends HorizontalScrollView {
         if (pos < 0) {
             pos = mCurrentPosition;
         }
-        if (pos >= 0 && pos < getTabItemCount()) {
-            View v = mTabContainer.getChildAt(pos);
+        int itemCount = getTabItemCount();
+        if (pos >= 0 && pos < itemCount) {
+            View v = getVirtualChildAt(pos, true);
             if (v instanceof Checkable) {
                 Checkable cv = (Checkable) v;
                 if (cv.isChecked() != checked) {
@@ -638,7 +574,7 @@ public class HorizontalSlideTab extends HorizontalScrollView {
 
     public View getSelectedView() {
         if (mCurrentPosition >= 0 && mCurrentPosition < getTabItemCount()) {
-            return mTabContainer.getChildAt(mCurrentPosition);
+            return getVirtualChildAt(mCurrentPosition,true);
         }
         return null;
     }
@@ -706,16 +642,6 @@ public class HorizontalSlideTab extends HorizontalScrollView {
     public void setBottomLineColorId(int resId) {
         this.mBottomLineColor = getResources().getColor(resId);
         invalidate();
-    }
-
-    public void setScrollOffset(int scrollOffsetPx) {
-        this.scrollOffset = scrollOffsetPx;
-        invalidate();
-    }
-
-    public void setShouldItemExpand(boolean shouldItemExpand) {
-        this.mShouldItemExpand = shouldItemExpand;
-        requestLayout();
     }
 
     public void setAutoCheckState(boolean autoCheckState) {
@@ -837,49 +763,40 @@ public class HorizontalSlideTab extends HorizontalScrollView {
 
 
     public void autoScroll(int from, int to, Animation.AnimationListener l) {
-        if (from >= 0 && to >= 0 && (from < mTabContainer.getChildCount() && to < mTabContainer.getChildCount())) {
+        int childCount = getItemCount();
+        if (from >= 0 && to >= 0 && (from < childCount && to < childCount)) {
             if (getAnimation() != null) {
                 getAnimation().cancel();
                 clearAnimation();
             }
-            int maxX = mTabContainer.getMeasuredWidth() - getMeasuredWidth();
-            int xfrom = Math.min(maxX, mTabContainer.getChildAt(from).getLeft());
-            int xto = Math.min(maxX, mTabContainer.getChildAt(to).getLeft());
-            int absDx = Math.abs(xfrom - xto);
-            CustScrollAnima anim = new CustScrollAnima(xfrom, xto);
-            int measureWidth = getMeasuredWidth();
-            //modified by renzheng .may be measure width is zero.
-            if (measureWidth == 0) {
-                measureWidth = Math.max(getSuggestedMinimumWidth(), 1);
+            boolean horizontal = mOrientation == HORIZONTAL;
+            int scrollFrom = computeScrollOffset(getVirtualChildAt(from, true), 0, false, horizontal);
+            int scrollTo = computeScrollOffset(getVirtualChildAt(to, true), 0, false, horizontal);
+            if (scrollTo != scrollFrom) {
+                int absDx = Math.abs(scrollTo - scrollFrom);
+                CustScrollAnima anim = new CustScrollAnima(scrollFrom, scrollTo);
+                int measureWidth = getMeasuredWidth();
+                if (measureWidth == 0) {
+                    measureWidth = Math.max(getSuggestedMinimumWidth(), 1);
+                }
+                anim.setDuration(Math.min(4000, absDx * 1800 / measureWidth));
+                anim.setInterpolator(new LinearInterpolator());
+                anim.setAnimationListener(l);
+                startAnimation(anim);
             }
-            anim.setDuration(Math.min(4000, absDx * 1800 / measureWidth));
-            anim.setInterpolator(new LinearInterpolator());
-            anim.setAnimationListener(l);
-            startAnimation(anim);
         }
     }
 
     class CustScrollAnima extends Animation {
         private int mScrollFrom, mScrollTo;
-
         public CustScrollAnima(int from, int to) {
             mScrollFrom = from;
             mScrollTo = to;
         }
-
         @Override
         protected void applyTransformation(float interpolatedTime, Transformation t) {
             int current = (int) (mScrollFrom + (mScrollTo - mScrollFrom) * interpolatedTime);
             scrollTo(current, 0);
-        }
-    }
-
-    @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (isEnabled()) {
-            return super.dispatchTouchEvent(ev);
-        } else {
-            return true;
         }
     }
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <declare-styleable name="HorizontalSlideTab">
+    <declare-styleable name="PageScrollTab">
         <!--tab item 的背景-->
         <attr name="tabItemBackground" format="reference"/>
         <attr name="tabItemBackgroundFirst" format="reference"/>
@@ -36,11 +36,5 @@
 
         <!--item 文字颜色-->
         <attr name="tabItemTextColor" format="reference"/>
-
-        <!-- 是否item 按权重展开 -->
-        <attr name="tabItemShouldExpand" format="boolean"/>
-
-        <!-- tab 初始偏移量-->
-        <attr name="tabScrollOffset" format="dimension"/>
     </declare-styleable>
 </resources>

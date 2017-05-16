@@ -10,7 +10,7 @@ import android.widget.TextView;
 import android.widget.ToggleButton;
 
 import com.rexy.pagescrollview.R;
-import com.rexy.widget.HorizontalSlideTab;
+import com.rexy.widget.PageScrollTab;
 import com.rexy.widget.PageScrollView;
 
 /**
@@ -19,7 +19,7 @@ import com.rexy.widget.PageScrollView;
 
 public class ExamplePageViewFragment extends ExampleFragment {
 
-    HorizontalSlideTab mSlideTab;
+    PageScrollTab mSlideTab;
     ToggleButton mToggleHeader;
     ToggleButton mToggleFooter;
 
@@ -33,7 +33,7 @@ public class ExamplePageViewFragment extends ExampleFragment {
     @Override
     protected void initView(View root) {
         super.initView(root);
-        mSlideTab = (HorizontalSlideTab) root.findViewById(R.id.pageTabs);
+        mSlideTab = (PageScrollTab) root.findViewById(R.id.pageTabs);
         mToggleHeader = (ToggleButton) root.findViewById(R.id.togglePageHeader);
         mToggleFooter = (ToggleButton) root.findViewById(R.id.togglePageFooter);
         mToggleHeader.setOnCheckedChangeListener(this);
@@ -41,7 +41,7 @@ public class ExamplePageViewFragment extends ExampleFragment {
         initPageTab(mPageScrollView, mSlideTab);
     }
 
-    private void initPageTab(final PageScrollView scrollView, final HorizontalSlideTab tabHost) {
+    private void initPageTab(final PageScrollView scrollView, final PageScrollTab tabHost) {
         final View.OnClickListener pageClick1 = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -61,9 +61,9 @@ public class ExamplePageViewFragment extends ExampleFragment {
             }
         }
 
-        tabHost.setTabClickListener(new HorizontalSlideTab.ITabClickEvent() {
+        tabHost.setTabClickListener(new PageScrollTab.ITabClickEvent() {
             @Override
-            public boolean onTabClicked(HorizontalSlideTab parent, View cur, int curPos, View pre, int prePos) {
+            public boolean onTabClicked(PageScrollTab parent, View cur, int curPos, View pre, int prePos) {
                 scrollView.scrollToCentre(curPos, 0, -1);
                 return false;
             }

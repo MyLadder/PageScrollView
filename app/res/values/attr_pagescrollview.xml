@@ -13,5 +13,6 @@
         <attr name="floatViewStartIndex" format="integer"/>
         <attr name="floatViewEndIndex" format="integer"/>
         <attr name="childCenter" format="boolean"/>
+        <attr name="childFillParent" format="boolean"/>
     </declare-styleable>
 </resources>

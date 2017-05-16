@@ -7,7 +7,6 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.ViewCompat;
-import android.support.v4.view.ViewConfigurationCompat;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
@@ -51,6 +50,7 @@ public class PageScrollView extends ViewGroup {
     protected int mFloatViewStart = -1;
     protected int mFloatViewEnd = -1;
     protected boolean isChildCenter = false;
+    protected boolean isChildFillParent = true;
     protected boolean mAttachLayout = false;
 
     protected int mSwapViewIndex = -1;
@@ -119,11 +119,11 @@ public class PageScrollView extends ViewGroup {
     }
 
     private void init(Context context, AttributeSet attributeSet) {
-        final ViewConfiguration configuration = ViewConfiguration.get(context);
         final float density = context.getResources().getDisplayMetrics().density;
-        mTouchSlop = ViewConfigurationCompat.getScaledPagingTouchSlop(configuration);
-        mMinimumVelocity = (int) (400 * density);
-        mMinDistance = (int) (25 * density);
+        final ViewConfiguration configuration = ViewConfiguration.get(context);
+        mTouchSlop = configuration.getScaledTouchSlop();
+        mMinimumVelocity = (int) (350 * density);
+        mMinDistance = (int) (mTouchSlop * 1.2f);
         mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
         mOverFlingDistance = configuration.getScaledOverflingDistance() * 2;
         setDescendantFocusability(FOCUS_AFTER_DESCENDANTS);
@@ -139,6 +139,7 @@ public class PageScrollView extends ViewGroup {
             mFloatViewStart = attr.getInt(R.styleable.PageScrollView_floatViewStartIndex, mFloatViewStart);
             mFloatViewEnd = attr.getInt(R.styleable.PageScrollView_floatViewEndIndex, mFloatViewEnd);
             isChildCenter = attr.getBoolean(R.styleable.PageScrollView_childCenter, isChildCenter);
+            isChildFillParent = attr.getBoolean(R.styleable.PageScrollView_childFillParent, isChildFillParent);
             mOverFlingDistance = attr.getDimensionPixelSize(R.styleable.PageScrollView_overFlingDistance, mOverFlingDistance);
         }
     }
@@ -153,9 +154,9 @@ public class PageScrollView extends ViewGroup {
             if (!isViewPagerStyle) {
                 boolean oldHorizontal = mOrientation == VERTICAL;
                 int scrollLength = oldHorizontal ? getScrollX() : getScrollY();
-                mCurrItem = resolveScrollViewFirstViewIndex(scrollLength, oldHorizontal);
-                resetFloatViewOffset(mFloatViewStartIndex, oldHorizontal);
-                resetFloatViewOffset(mFloatViewEndIndex, oldHorizontal);
+                mCurrItem = computeFirstViewIndex(scrollLength, oldHorizontal);
+                resetPositionForFloatView(mFloatViewStartIndex, oldHorizontal);
+                resetPositionForFloatView(mFloatViewEndIndex, oldHorizontal);
                 mFloatViewStartIndex = -1;
                 mSwapViewIndex = -1;
                 mFloatViewStartMode = 0;
@@ -219,7 +220,7 @@ public class PageScrollView extends ViewGroup {
 
     public void setFloatViewStartIndex(int floatStartIndex) {
         if (mFloatViewStart != floatStartIndex) {
-            resetFloatViewOffset(mFloatViewStartIndex, mOrientation == HORIZONTAL);
+            resetPositionForFloatView(mFloatViewStartIndex, mOrientation == HORIZONTAL);
             mFloatViewStart = floatStartIndex;
             if (mFloatViewStart >= 0) {
                 mNeedResolveFloatOffset = true;
@@ -237,7 +238,7 @@ public class PageScrollView extends ViewGroup {
 
     public void setFloatViewEndIndex(int floatEndIndex) {
         if (mFloatViewEnd != floatEndIndex) {
-            resetFloatViewOffset(mFloatViewEndIndex, mOrientation == HORIZONTAL);
+            resetPositionForFloatView(mFloatViewEndIndex, mOrientation == HORIZONTAL);
             mFloatViewEnd = floatEndIndex;
             if (mFloatViewEnd >= 0) {
                 mNeedResolveFloatOffset = true;
@@ -284,6 +285,19 @@ public class PageScrollView extends ViewGroup {
     public void setChildCenter(boolean centerChild) {
         if (this.isChildCenter != centerChild) {
             this.isChildCenter = centerChild;
+            if (mAttachLayout) {
+                requestLayout();
+            }
+        }
+    }
+
+    public boolean isChildFillParent(){
+        return isChildFillParent;
+    }
+
+    public void setChildFillParent(boolean childFillParent){
+        if(isChildFillParent!=childFillParent){
+            this.isChildFillParent = childFillParent;
             if (mAttachLayout) {
                 requestLayout();
             }
@@ -343,7 +357,7 @@ public class PageScrollView extends ViewGroup {
                     }
                 }
                 if (mPageTransformer != null) {
-                    resolvePageOffset(mOrientation == HORIZONTAL ? getScrollX() : getScrollY(), getItemCount());
+                    resolvePageOffset(mOrientation == HORIZONTAL ? getScrollX() : getScrollY(), getItemCount(), mOrientation == HORIZONTAL);
                 }
             }
         }
@@ -470,71 +484,31 @@ public class PageScrollView extends ViewGroup {
         return -1;
     }
 
+    protected boolean floatViewScrollNeeded(View view, boolean horizontal) {
+        boolean scrollOk = view != null;
+        if (scrollOk) {
+            int scrollRange = 0, viewSize;
+            if (horizontal) {
+                if (mContentWidth > 0) {
+                    scrollRange = Math.max(0, mContentWidth - (getMeasuredWidth() - getPaddingLeft() - getPaddingRight()));
+                }
+                viewSize = view.getMeasuredWidth() + ((PageScrollView.LayoutParams) view.getLayoutParams()).getMarginHorizontal();
+            } else {
+                if (mContentHeight > 0) {
+                    scrollRange = Math.max(0, mContentHeight - (getMeasuredHeight() - getPaddingTop() - getPaddingBottom()));
+                }
+                viewSize = view.getMeasuredHeight() + ((PageScrollView.LayoutParams) view.getLayoutParams()).getMarginVertical();
+            }
+            scrollOk = scrollRange >= viewSize;
+        }
+        return scrollOk;
+    }
+
     protected int translateMeasure(int spec, int padding, boolean limitedSize) {
         int specMode = MeasureSpec.getMode(spec);
         int specSize = MeasureSpec.getSize(spec);
         int size = limitedSize ? Math.max(0, specSize - padding) : Integer.MAX_VALUE;
         return MeasureSpec.makeMeasureSpec(size, specMode);
-    }
-
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int childState = 0, headerExtraWidth = 0, headerExtraHeight = 0;
-        final int paddingHorizontal = getPaddingLeft() + getPaddingRight();
-        final int paddingVertical = getPaddingTop() + getPaddingBottom();
-        boolean horizontal = mOrientation == HORIZONTAL;
-        mContentWidth = 0;
-        mContentHeight = 0;
-        mVirtualCount = getVirtualChildCount(true);
-        if (mPageHeaderView != null || mPageFooterView != null) {
-            final int measureSpecWidth = translateMeasure(widthMeasureSpec, paddingHorizontal, true);
-            final int measureSpecHeight = translateMeasure(heightMeasureSpec, paddingVertical, true);
-            childState = measurePageExtraView(mPageHeaderView, measureSpecWidth, measureSpecHeight, horizontal) | childState;
-            childState = measurePageExtraView(mPageFooterView, measureSpecWidth, measureSpecHeight, horizontal) | childState;
-            if (mContentWidth > 0 || mContentHeight > 0) {
-                if (horizontal) {
-                    headerExtraHeight = mContentHeight;
-                } else {
-                    headerExtraWidth = mContentWidth;
-                }
-            }
-        }
-        if (mVirtualCount > 0) {
-            final int measureSpecWidth = translateMeasure(widthMeasureSpec, paddingHorizontal + headerExtraWidth, !horizontal);
-            final int measureSpecHeight = translateMeasure(heightMeasureSpec, paddingVertical + headerExtraHeight, horizontal);
-            int fixedSize = 0, scrollParentRealSize;
-            /**
-             int specMode = MeasureSpec.getMode(spec);
-             int specSize = MeasureSpec.getSize(spec);
-             int size = limitedSize ? Math.max(0, specSize - padding) : Integer.MAX_VALUE;
-             return MeasureSpec.makeMeasureSpec(size, specMode);
-             */
-            if (horizontal) {
-                scrollParentRealSize = Math.max(0, MeasureSpec.getSize(widthMeasureSpec) - paddingHorizontal);
-                if (mSizeFixedPercent > 0 && mSizeFixedPercent <= 1) {
-                    fixedSize = (int) (MeasureSpec.getSize(widthMeasureSpec) * mSizeFixedPercent);
-                }
-                childState = measureMiddleViewHorizontal(measureSpecWidth, measureSpecHeight, fixedSize, scrollParentRealSize) | childState;
-            } else {
-                scrollParentRealSize = Math.max(0, MeasureSpec.getSize(heightMeasureSpec) - paddingVertical);
-                if (mSizeFixedPercent > 0 && mSizeFixedPercent <= 1) {
-                    fixedSize = (int) (MeasureSpec.getSize(heightMeasureSpec) * mSizeFixedPercent);
-                }
-                childState = measureMiddleViewVertical(measureSpecWidth, measureSpecHeight, fixedSize, scrollParentRealSize) | childState;
-            }
-        }
-        int maxWidth = Math.max(mContentWidth + paddingHorizontal, getSuggestedMinimumWidth());
-        int maxHeight = Math.max(mContentHeight + paddingVertical, getSuggestedMinimumWidth());
-        if (mMaxWidth > 0 && maxWidth > mMaxWidth) {
-            maxWidth = mMaxWidth;
-        }
-        if (mMaxHeight > 0 && maxHeight > mMaxHeight) {
-            maxHeight = mMaxHeight;
-        }
-        setMeasuredDimension(resolveSizeAndState(maxWidth, widthMeasureSpec, childState),
-                resolveSizeAndState(maxHeight, heightMeasureSpec, childState << MEASURED_HEIGHT_STATE_SHIFT));
-        measureFloatViewStart(mFloatViewStart, mVirtualCount);
-        measureFloatViewEnd(mFloatViewEnd, mVirtualCount);
     }
 
     protected void measureFloatViewStart(int itemIndex, int virtualCount) {
@@ -563,56 +537,120 @@ public class PageScrollView extends ViewGroup {
         }
     }
 
-    protected boolean floatViewScrollNeeded(View view, boolean horizontal) {
-        boolean scrollOk = view != null;
-        if (scrollOk) {
-            int scrollRange = 0, viewSize;
-            if (horizontal) {
-                if (mContentWidth > 0) {
-                    scrollRange = Math.max(0, mContentWidth - (getMeasuredWidth() - getPaddingLeft() - getPaddingRight()));
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        boolean horizontal = mOrientation == HORIZONTAL;
+        dispatchMeasure(widthMeasureSpec, heightMeasureSpec, horizontal);
+        if (isChildFillParent) {
+            int selfWidth = getMeasuredWidth(), selfHeight = getMeasuredHeight();
+            int contentWidthWithPadding = mContentWidth + getPaddingLeft() + getPaddingRight();
+            int contentHeightWithPadding = mContentHeight + getPaddingTop() + getPaddingBottom();
+            int adjustTotal = horizontal ? (selfWidth - contentWidthWithPadding) : (selfHeight - contentHeightWithPadding);
+            if (adjustTotal > 0 && adjustTotal > mVirtualCount) {
+                int adjustSize = adjustTotal / mVirtualCount, childCount = getChildCount();
+                for (int i = 0; i < childCount; i++) {
+                    final View child = getChildAt(i);
+                    if (child.getVisibility() == View.GONE || (child == mPageHeaderView || child == mPageFooterView))
+                        continue;
+                    if (horizontal) {
+                        child.setMinimumWidth(child.getMeasuredWidth() + adjustSize);
+                    } else {
+                        child.setMinimumHeight(child.getMeasuredHeight() + adjustSize);
+                    }
                 }
-                viewSize = view.getMeasuredWidth() + ((PageScrollView.LayoutParams) view.getLayoutParams()).getMarginHorizontal();
-            } else {
-                if (mContentHeight > 0) {
-                    scrollRange = Math.max(0, mContentHeight - (getMeasuredHeight() - getPaddingTop() - getPaddingBottom()));
-                }
-                viewSize = view.getMeasuredHeight() + ((PageScrollView.LayoutParams) view.getLayoutParams()).getMarginVertical();
             }
-            scrollOk = scrollRange >= viewSize;
         }
-        return scrollOk;
+        measureFloatViewStart(mFloatViewStart, mVirtualCount);
+        measureFloatViewEnd(mFloatViewEnd, mVirtualCount);
     }
 
-    protected int measureMiddleViewHorizontal(int widthMeasureSpec, int heightMeasureSpec, int childFixedSize, final int parentRealSize) {
-        final int childCount = getChildCount();
-        int childFixedWidthSpec = childFixedSize <= 0 ? 0 : MeasureSpec.makeMeasureSpec(childFixedSize, MeasureSpec.EXACTLY);
-        int contentWidth = 0;
-        int contentHeight = 0;
-        int measuredCount = 0;
+    protected void dispatchMeasure(int widthMeasureSpec, int heightMeasureSpec, boolean horizontal) {
+        int childState = 0, headerExtraWidth = 0, headerExtraHeight = 0;
+        final int paddingHorizontal = getPaddingLeft() + getPaddingRight();
+        final int paddingVertical = getPaddingTop() + getPaddingBottom();
+        mContentWidth = 0;
+        mContentHeight = 0;
+        mVirtualCount = getVirtualChildCount(true);
+        if (mPageHeaderView != null || mPageFooterView != null) {
+            final int measureSpecWidth = translateMeasure(widthMeasureSpec, paddingHorizontal, true);
+            final int measureSpecHeight = translateMeasure(heightMeasureSpec, paddingVertical, true);
+            childState = measureExtraView(mPageHeaderView, measureSpecWidth, measureSpecHeight, horizontal) | childState;
+            childState = measureExtraView(mPageFooterView, measureSpecWidth, measureSpecHeight, horizontal) | childState;
+            if (mContentWidth > 0 || mContentHeight > 0) {
+                if (horizontal) {
+                    headerExtraHeight = mContentHeight;
+                } else {
+                    headerExtraWidth = mContentWidth;
+                }
+            }
+        }
+        if (mVirtualCount > 0) {
+            final int measureSpecWidth = translateMeasure(widthMeasureSpec, paddingHorizontal + headerExtraWidth, !horizontal);
+            final int measureSpecHeight = translateMeasure(heightMeasureSpec, paddingVertical + headerExtraHeight, horizontal);
+            int fixedSize = 0, scrollParentRealSize;
+            /**
+             int specMode = MeasureSpec.getMode(spec);
+             int specSize = MeasureSpec.getSize(spec);
+             int size = limitedSize ? Math.max(0, specSize - padding) : Integer.MAX_VALUE;
+             return MeasureSpec.makeMeasureSpec(size, specMode);
+             */
+            if (horizontal) {
+                scrollParentRealSize = Math.max(0, MeasureSpec.getSize(widthMeasureSpec) - paddingHorizontal);
+                if (mSizeFixedPercent > 0 && mSizeFixedPercent <= 1) {
+                    fixedSize = (int) (scrollParentRealSize * mSizeFixedPercent);
+                }
+                childState = measureMiddleViewHorizontal(measureSpecWidth, measureSpecHeight, fixedSize, scrollParentRealSize) | childState;
+            } else {
+                scrollParentRealSize = Math.max(0, MeasureSpec.getSize(heightMeasureSpec) - paddingVertical);
+                if (mSizeFixedPercent > 0 && mSizeFixedPercent <= 1) {
+                    fixedSize = (int) (scrollParentRealSize * mSizeFixedPercent);
+                }
+                childState = measureMiddleViewVertical(measureSpecWidth, measureSpecHeight, fixedSize, scrollParentRealSize) | childState;
+            }
+        }
+        int maxWidth = Math.max(mContentWidth + paddingHorizontal, getSuggestedMinimumWidth());
+        int maxHeight = Math.max(mContentHeight + paddingVertical, getSuggestedMinimumWidth());
+        if (mMaxWidth > 0 && maxWidth > mMaxWidth) {
+            maxWidth = mMaxWidth;
+        }
+        if (mMaxHeight > 0 && maxHeight > mMaxHeight) {
+            maxHeight = mMaxHeight;
+        }
+        setMeasuredDimension(resolveSizeAndState(maxWidth, widthMeasureSpec, childState),
+                resolveSizeAndState(maxHeight, heightMeasureSpec, childState << MEASURED_HEIGHT_STATE_SHIFT));
+    }
+
+    protected int measureExtraView(View view, int widthMeasureSpec, int heightMeasureSpec, boolean horizontal) {
         int childState = 0;
-        for (int i = 0; i < childCount; i++) {
-            final View child = getChildAt(i);
-            if (child.getVisibility() == View.GONE || (child == mPageHeaderView || child == mPageFooterView))
-                continue;
-            PageScrollView.LayoutParams params = (PageScrollView.LayoutParams) child.getLayoutParams();
+        if (isChildNotGone(view)) {
+            PageScrollView.LayoutParams params = (PageScrollView.LayoutParams) view.getLayoutParams();
             int childMarginHorizontal = params.getMarginHorizontal();
             int childMarginVertical = params.getMarginVertical();
-            int childWidthSpec = childFixedWidthSpec == 0 ? getMiddleChildMeasureSpec(widthMeasureSpec, parentRealSize, childMarginHorizontal, params.width) : childFixedWidthSpec;
-            int childHeightSpec = getMiddleChildMeasureSpec(heightMeasureSpec, 0, childMarginVertical, params.height);
-            child.measure(childWidthSpec, childHeightSpec);
-            if (mMiddleMargin > 0 && measuredCount > 0) {
-                contentWidth += mMiddleMargin;
+            int extraMeasureWidthSpec = getChildMeasureSpec(widthMeasureSpec, childMarginHorizontal, params.width);
+            int extraMeasureHeightSpec = getChildMeasureSpec(heightMeasureSpec, childMarginVertical, params.height);
+            if (horizontal) {
+                if (params.width == -1) {
+                    extraMeasureWidthSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(extraMeasureWidthSpec), MeasureSpec.EXACTLY);
+                }
+                view.measure(extraMeasureWidthSpec, extraMeasureHeightSpec);
+                int contentHeight = view.getMeasuredHeight() + childMarginVertical;
+                mContentWidth = Math.max(mContentWidth, view.getMeasuredWidth() + childMarginHorizontal);
+                if (contentHeight > 0) {
+                    mContentHeight += contentHeight;
+                }
+            } else {
+                if (params.height == -1) {
+                    extraMeasureHeightSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(extraMeasureHeightSpec), MeasureSpec.EXACTLY);
+                }
+                view.measure(extraMeasureWidthSpec, extraMeasureHeightSpec);
+                int contentWidth = view.getMeasuredWidth() + childMarginHorizontal;
+                if (contentWidth > 0) {
+                    mContentWidth += contentWidth;
+                }
+                mContentHeight = Math.max(mContentHeight, view.getMeasuredHeight() + childMarginVertical);
             }
-            contentWidth += (child.getMeasuredWidth() + childMarginHorizontal);
-            int itemHeight = child.getMeasuredHeight() + childMarginVertical;
-            if (contentHeight < itemHeight) {
-                contentHeight = itemHeight;
-            }
-            childState |= child.getMeasuredState();
-            measuredCount++;
+            childState = view.getMeasuredState();
         }
-        mContentWidth = Math.max(mContentWidth, contentWidth);
-        mContentHeight += contentHeight;
         return childState;
     }
 
@@ -649,37 +687,36 @@ public class PageScrollView extends ViewGroup {
         return childState;
     }
 
-    protected int measurePageExtraView(View view, int widthMeasureSpec, int heightMeasureSpec, boolean horizontal) {
+    protected int measureMiddleViewHorizontal(int widthMeasureSpec, int heightMeasureSpec, int childFixedSize, final int parentRealSize) {
+        final int childCount = getChildCount();
+        int childFixedWidthSpec = childFixedSize <= 0 ? 0 : MeasureSpec.makeMeasureSpec(childFixedSize, MeasureSpec.EXACTLY);
+        int contentWidth = 0;
+        int contentHeight = 0;
+        int measuredCount = 0;
         int childState = 0;
-        if (isChildNotGone(view)) {
-            PageScrollView.LayoutParams params = (PageScrollView.LayoutParams) view.getLayoutParams();
+        for (int i = 0; i < childCount; i++) {
+            final View child = getChildAt(i);
+            if (child.getVisibility() == View.GONE || (child == mPageHeaderView || child == mPageFooterView))
+                continue;
+            PageScrollView.LayoutParams params = (PageScrollView.LayoutParams) child.getLayoutParams();
             int childMarginHorizontal = params.getMarginHorizontal();
             int childMarginVertical = params.getMarginVertical();
-            int extraMeasureWidthSpec = getChildMeasureSpec(widthMeasureSpec, childMarginHorizontal, params.width);
-            int extraMeasureHeightSpec = getChildMeasureSpec(heightMeasureSpec, childMarginVertical, params.height);
-            if (horizontal) {
-                if (params.width == -1) {
-                    extraMeasureWidthSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(extraMeasureWidthSpec), MeasureSpec.EXACTLY);
-                }
-                view.measure(extraMeasureWidthSpec, extraMeasureHeightSpec);
-                int contentHeight = view.getMeasuredHeight() + childMarginVertical;
-                mContentWidth = Math.max(mContentWidth, view.getMeasuredWidth() + childMarginHorizontal);
-                if (contentHeight > 0) {
-                    mContentHeight += contentHeight;
-                }
-            } else {
-                if (params.height == -1) {
-                    extraMeasureHeightSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(extraMeasureHeightSpec), MeasureSpec.EXACTLY);
-                }
-                view.measure(extraMeasureWidthSpec, extraMeasureHeightSpec);
-                int contentWidth = view.getMeasuredWidth() + childMarginHorizontal;
-                if (contentWidth > 0) {
-                    mContentWidth += contentWidth;
-                }
-                mContentHeight = Math.max(mContentHeight, view.getMeasuredHeight() + childMarginVertical);
+            int childWidthSpec = childFixedWidthSpec == 0 ? getMiddleChildMeasureSpec(widthMeasureSpec, parentRealSize, childMarginHorizontal, params.width) : childFixedWidthSpec;
+            int childHeightSpec = getMiddleChildMeasureSpec(heightMeasureSpec, 0, childMarginVertical, params.height);
+            child.measure(childWidthSpec, childHeightSpec);
+            if (mMiddleMargin > 0 && measuredCount > 0) {
+                contentWidth += mMiddleMargin;
             }
-            childState = view.getMeasuredState();
+            contentWidth += (child.getMeasuredWidth() + childMarginHorizontal);
+            int itemHeight = child.getMeasuredHeight() + childMarginVertical;
+            if (contentHeight < itemHeight) {
+                contentHeight = itemHeight;
+            }
+            childState |= child.getMeasuredState();
+            measuredCount++;
         }
+        mContentWidth = Math.max(mContentWidth, contentWidth);
+        mContentHeight += contentHeight;
         return childState;
     }
 
@@ -708,12 +745,18 @@ public class PageScrollView extends ViewGroup {
         int width = r - l, height = b - t;
         int baseLeft = getContentStart(left, width - right, mContentWidth, mGravity, true);
         int baseTop = getContentStart(top, height - bottom, mContentHeight, mGravity, false);
+        dispatchLayout(width, height, baseLeft, baseTop);
+    }
+
+    protected void dispatchLayout(int width, int height, int baseLeft, int baseTop) {
         if (mOrientation == HORIZONTAL) {
+            int left = getPaddingLeft(), right = getPaddingRight();
             if (baseLeft < left) {
                 baseLeft = left;
             }
             onLayoutHorizontal(baseLeft, baseTop, width - left - right);
         } else {
+            int top = getPaddingTop(), bottom = getPaddingBottom();
             if (baseTop < top) {
                 baseTop = top;
             }
@@ -721,23 +764,20 @@ public class PageScrollView extends ViewGroup {
         }
         if (mAttachLayout == false) {
             mAttachLayout = true;
-            if (mScrollInfo.left >= 0 || mPrevItem == -1) {
-                scrollAfterLayout();
-            }
-            invalidate();
+            doAfterAttachLayout();
         } else {
             if (mNeedResolveFloatOffset) {
                 mNeedResolveFloatOffset = false;
                 boolean horizontal = mOrientation == HORIZONTAL;
                 int scrollLength = horizontal ? getScrollX() : getScrollY();
                 if (mFloatViewStartIndex >= 0 && mSwapViewIndex < 0) {
-                    mSwapViewIndex = calculateSwapViewIndex(scrollLength, horizontal);
+                    mSwapViewIndex = computeSwapViewIndex(scrollLength, horizontal);
                 }
                 if (mFloatViewStartMode == FLOAT_VIEW_SCROLL || mFloatViewEndMode == FLOAT_VIEW_SCROLL) {
-                    resolveFloatViewOffset(scrollLength, horizontal);
+                    updatePositionForFloatView(scrollLength, horizontal);
                 }
                 if (mPageHeaderView != null || mPageFooterView != null) {
-                    resolvePageHeaderFooterOffset(scrollLength, horizontal);
+                    updatePositionForHeaderAndFooter(scrollLength, horizontal);
                 }
             }
         }
@@ -829,49 +869,36 @@ public class PageScrollView extends ViewGroup {
         }
     }
 
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        mAttachLayout = false;
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        mAttachLayout = false;
-    }
-
-    protected int calculateSwapViewIndex(int scrolled, boolean horizontal) {
-        if (mFloatViewStartIndex >= 0) {
-            int count = getChildCount(), baseLine;
-            View view = getChildAt(mFloatViewStartIndex);
-            baseLine = (horizontal ? view.getRight() : view.getBottom()) + scrolled;
-            for (int i = mFloatViewStartIndex + 1; i < count; i++) {
-                final View child = getChildAt(i);
-                if (child.getVisibility() == View.GONE || (child == mPageHeaderView || child == mPageFooterView))
-                    continue;
-                if (horizontal) {
-                    if (child.getRight() >= baseLine) {
-                        return i;
-                    }
-                } else {
-                    if (child.getBottom() >= baseLine) {
-                        return i;
-                    }
+    protected void doAfterAttachLayout() {
+        if (mScrollInfo.left >= 0 || mPrevItem == -1) {
+            boolean needAdjustPageTransform = mPrevItem == -1;
+            if (mScrollInfo.left >= 0) {
+                View pageView = getItemView(mScrollInfo.left);
+                if (pageView != null) {
+                    scrollTo(pageView, mScrollInfo.top, mScrollInfo.right, 1 == mScrollInfo.bottom);
+                }
+                mScrollInfo.set(-1, -1, -1, -1);
+            } else {
+                if (mPrevItem == -1 && mVirtualCount > 0) {
+                    setCurrentItem(mCurrItem);
+                }
+            }
+            if (needAdjustPageTransform) {
+                mNeedResolveFloatOffset = false;
+                boolean horizontal = mOrientation == HORIZONTAL;
+                int scrollLength = horizontal ? getScrollX() : getScrollY();
+                if (mFloatViewStartMode == FLOAT_VIEW_SCROLL || mFloatViewEndMode == FLOAT_VIEW_SCROLL) {
+                    updatePositionForFloatView(scrollLength, horizontal);
+                }
+                if (mPageHeaderView != null || mPageFooterView != null) {
+                    updatePositionForHeaderAndFooter(scrollLength, horizontal);
+                }
+                if ((mPageListener != null || mPageTransformer != null)) {
+                    resolvePageOffset(scrollLength, getItemCount(), horizontal);
                 }
             }
         }
-        return -1;
     }
-
-    protected void resetFloatViewOffset(int realChildIndex, boolean horizontal) {
-        View child = realChildIndex >= 0 ? getChildAt(realChildIndex) : null;
-        if (child != null) {
-            child.setTranslationX(0);
-            child.setTranslationY(0);
-        }
-    }
-
     @Override
     protected void dispatchDraw(Canvas canvas) {
         boolean swapIndexEnable = mFloatViewStartIndex >= 0 && mSwapViewIndex >= 0;
@@ -900,93 +927,8 @@ public class PageScrollView extends ViewGroup {
     }
 
     @Override
-    protected int computeHorizontalScrollOffset() {
-        return Math.max(0, super.computeHorizontalScrollOffset());
-    }
-
-    @Override
-    protected int computeHorizontalScrollRange() {
-        final int count = getChildCount();
-        final int paddingLeft = getPaddingLeft();
-        final int contentWidth = getWidth() - paddingLeft - getPaddingRight();
-        if (count == 0) {
-            return contentWidth;
-        }
-        int scrollRange = paddingLeft + mContentWidth;
-        final int scrollX = getScrollX();
-        final int overscrollRight = Math.max(0, scrollRange - contentWidth);
-        if (scrollX < 0) {
-            scrollRange -= scrollX;
-        } else if (scrollX > overscrollRight) {
-            scrollRange += scrollX - overscrollRight;
-        }
-        return scrollRange;
-    }
-
-    @Override
-    protected int computeVerticalScrollOffset() {
-        return Math.max(0, super.computeVerticalScrollOffset());
-    }
-
-    @Override
-    protected int computeVerticalScrollRange() {
-        final int count = getChildCount();
-        final int paddingTop = getPaddingTop();
-        final int contentHeight = getHeight() - paddingTop - getPaddingBottom();
-        if (count == 0) {
-            return contentHeight;
-        }
-        int scrollRange = paddingTop + mContentHeight;
-        final int scrollY = getScrollY();
-        final int overscrollBottom = Math.max(0, scrollRange - contentHeight);
-        if (scrollY < 0) {
-            scrollRange -= scrollY;
-        } else if (scrollY > overscrollBottom) {
-            scrollRange += scrollY - overscrollBottom;
-        }
-        return scrollRange;
-    }
-
-    public int getScrollRangeHorizontal() {
-        int scrollRange = 0;
-        if (mContentWidth > 0) {
-            scrollRange = Math.max(0, mContentWidth - (getWidth() - getPaddingLeft() - getPaddingRight()));
-        }
-        return scrollRange;
-    }
-
-    protected int getScrollRangeVertical() {
-        int scrollRange = 0;
-        if (mContentHeight > 0) {
-            scrollRange = Math.max(0, mContentHeight - (getHeight() - getPaddingTop() - getPaddingBottom()));
-        }
-        return scrollRange;
-    }
-
-    protected int computeCenterScrollOffset(int pageItemIndex, int pageItemCount) {
-        if (pageItemIndex >= 0 && pageItemIndex < pageItemCount) {
-            View view = getVirtualChildAt(pageItemIndex, true);
-            int viewCenter, contentCenter, range;
-            if (mOrientation == HORIZONTAL) {
-                int paddingLeft = getPaddingLeft();
-                contentCenter = paddingLeft + (getWidth() - (paddingLeft + getPaddingRight())) / 2;
-                viewCenter = view.getLeft() + view.getWidth() / 2;
-                range = getScrollRangeHorizontal();
-            } else {
-                int paddingTop = getPaddingTop();
-                contentCenter = paddingTop + (getHeight() - (paddingTop + getPaddingBottom())) / 2;
-                viewCenter = view.getTop() + view.getHeight() / 2;
-                range = getScrollRangeVertical();
-            }
-            int result = viewCenter - contentCenter;
-            return Math.max(0, Math.min(range, result));
-        }
-        return 0;
-    }
-
-    @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (getChildCount() == 0 || !isEnabled()) {
+        if (mVirtualCount == 0 || !isEnabled()) {
             return super.onTouchEvent(event);
         }
         if (event.getAction() == MotionEvent.ACTION_DOWN && event.getEdgeFlags() != 0) {
@@ -1012,7 +954,7 @@ public class PageScrollView extends ViewGroup {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (getChildCount() == 0 || !isEnabled()) {
+        if (mVirtualCount== 0 || !isEnabled()) {
             mIsBeingDragged = false;
         } else {
             final int action = ev.getAction() & MotionEventCompat.ACTION_MASK;
@@ -1133,6 +1075,9 @@ public class PageScrollView extends ViewGroup {
             velocity = velocityY;
             moved = movedY;
         }
+        if (velocity == 0 && isViewPagerStyle) {
+            velocity = -(int)Math.signum((horizontal ? movedX : movedY));
+        }
         if (willScroll = isFlingAllowed(scroll, scrollRange, velocity)) {
             if (isViewPagerStyle) {
                 int targetIndex = mCurrItem;
@@ -1158,7 +1103,7 @@ public class PageScrollView extends ViewGroup {
                         }
                     }
                 }
-                int targetScroll = computeCenterScrollOffset(targetIndex, pageItemCount);
+                int targetScroll = computeScrollOffset(targetIndex, 0, true, horizontal);
                 if (willScroll = (targetScroll != scroll)) {
                     setCurrentItem(targetIndex);
                     int dScroll = targetScroll - scroll;
@@ -1180,6 +1125,22 @@ public class PageScrollView extends ViewGroup {
             }
         }
         return willScroll;
+    }
+
+    private void scrollDxDy(int scrollDx, int scrollDy) {
+        if (mOrientation == HORIZONTAL) {
+            int scrollWant = getScrollX() + scrollDx;
+            int scrollRange = getScrollRangeHorizontal();
+            if (scrollWant < 0) scrollWant = 0;
+            if (scrollWant > scrollRange) scrollWant = scrollRange;
+            scrollTo(scrollWant, getScrollY());
+        } else {
+            int scrollWant = getScrollY() + scrollDy;
+            int scrollRange = getScrollRangeVertical();
+            if (scrollWant < 0) scrollWant = 0;
+            if (scrollWant > scrollRange) scrollWant = scrollRange;
+            scrollTo(getScrollX(), scrollWant);
+        }
     }
 
     public void scrollTo(int index, int offset, int duration) {
@@ -1274,49 +1235,96 @@ public class PageScrollView extends ViewGroup {
         }
     }
 
-    private void scrollAfterLayout() {
-        boolean needAdjustPageTransform = mPrevItem == -1;
-        if (mScrollInfo.left >= 0) {
-            View pageView = getItemView(mScrollInfo.left);
-            if (pageView != null) {
-                scrollTo(pageView, mScrollInfo.top, mScrollInfo.right, 1 == mScrollInfo.bottom);
-            }
-            mScrollInfo.set(-1, -1, -1, -1);
-        } else {
-            if (mPrevItem == -1 && mVirtualCount > 0) {
-                setCurrentItem(mCurrItem);
-            }
+    protected int getScrollRangeVertical() {
+        int scrollRange = 0;
+        if (mContentHeight > 0) {
+            scrollRange = Math.max(0, mContentHeight - (getHeight() - getPaddingTop() - getPaddingBottom()));
         }
-        if (needAdjustPageTransform) {
-            mNeedResolveFloatOffset = false;
-            boolean horizontal = mOrientation == HORIZONTAL;
-            int scrollLength = horizontal ? getScrollX() : getScrollY();
-            if (mFloatViewStartMode == FLOAT_VIEW_SCROLL || mFloatViewEndMode == FLOAT_VIEW_SCROLL) {
-                resolveFloatViewOffset(scrollLength, horizontal);
-            }
-            if (mPageHeaderView != null || mPageFooterView != null) {
-                resolvePageHeaderFooterOffset(scrollLength, horizontal);
-            }
-            if ((mPageListener != null || mPageTransformer != null)) {
-                resolvePageOffset(scrollLength, getItemCount());
-            }
-        }
+        return scrollRange;
     }
 
-    private void scrollDxDy(int scrollDx, int scrollDy) {
-        if (mOrientation == HORIZONTAL) {
-            int scrollWant = getScrollX() + scrollDx;
-            int scrollRange = getScrollRangeHorizontal();
-            if (scrollWant < 0) scrollWant = 0;
-            if (scrollWant > scrollRange) scrollWant = scrollRange;
-            scrollTo(scrollWant, getScrollY());
-        } else {
-            int scrollWant = getScrollY() + scrollDy;
-            int scrollRange = getScrollRangeVertical();
-            if (scrollWant < 0) scrollWant = 0;
-            if (scrollWant > scrollRange) scrollWant = scrollRange;
-            scrollTo(getScrollX(), scrollWant);
+    protected int getScrollRangeHorizontal() {
+        int scrollRange = 0;
+        if (mContentWidth > 0) {
+            scrollRange = Math.max(0, mContentWidth - (getWidth() - getPaddingLeft() - getPaddingRight()));
         }
+        return scrollRange;
+    }
+
+    @Override
+    protected int computeVerticalScrollRange() {
+        final int count = getChildCount();
+        final int paddingTop = getPaddingTop();
+        final int contentHeight = getHeight() - paddingTop - getPaddingBottom();
+        if (count == 0) {
+            return contentHeight;
+        }
+        int scrollRange = paddingTop + mContentHeight;
+        final int scrollY = getScrollY();
+        final int overscrollBottom = Math.max(0, scrollRange - contentHeight);
+        if (scrollY < 0) {
+            scrollRange -= scrollY;
+        } else if (scrollY > overscrollBottom) {
+            scrollRange += scrollY - overscrollBottom;
+        }
+        return scrollRange;
+    }
+
+    @Override
+    protected int computeVerticalScrollOffset() {
+        return Math.max(0, super.computeVerticalScrollOffset());
+    }
+
+    @Override
+    protected int computeHorizontalScrollRange() {
+        final int count = getChildCount();
+        final int paddingLeft = getPaddingLeft();
+        final int contentWidth = getWidth() - paddingLeft - getPaddingRight();
+        if (count == 0) {
+            return contentWidth;
+        }
+        int scrollRange = paddingLeft + mContentWidth;
+        final int scrollX = getScrollX();
+        final int overscrollRight = Math.max(0, scrollRange - contentWidth);
+        if (scrollX < 0) {
+            scrollRange -= scrollX;
+        } else if (scrollX > overscrollRight) {
+            scrollRange += scrollX - overscrollRight;
+        }
+        return scrollRange;
+    }
+
+    @Override
+    protected int computeHorizontalScrollOffset() {
+        return Math.max(0, super.computeHorizontalScrollOffset());
+    }
+
+    protected int computeScrollOffset(View child, int offset, boolean centreWithParent, boolean horizontal) {
+        int paddingStart, childStart;
+        int scrollRange, targetScroll = offset;
+        if (horizontal) {
+            paddingStart = getPaddingLeft();
+            childStart = child.getLeft();
+            targetScroll += (childStart - paddingStart);
+            if (centreWithParent) {
+                targetScroll += (child.getWidth() - (getWidth() - paddingStart - getPaddingRight())) / 2;
+            }
+            scrollRange = getScrollRangeHorizontal();
+        } else {
+            paddingStart = getPaddingTop();
+            childStart = child.getTop();
+            targetScroll += (childStart - paddingStart);
+            if (centreWithParent) {
+                targetScroll += (child.getHeight() - (getHeight() - paddingStart - getPaddingBottom())) / 2;
+            }
+            scrollRange = getScrollRangeVertical();
+        }
+        return Math.max(0, Math.min(scrollRange, targetScroll));
+    }
+
+    protected int computeScrollOffset(int childPosition, int offset, boolean centreWithParent, boolean horizontal) {
+        View child = getVirtualChildAt(childPosition, true);
+        return child == null ? 0 : computeScrollOffset(child, offset, centreWithParent, horizontal);
     }
 
     protected int computeScrollDurationForItem(int willMoved, int absVelocity, int itemSized, int containerSize) {
@@ -1433,20 +1441,51 @@ public class PageScrollView extends ViewGroup {
         boolean horizontal = mOrientation == HORIZONTAL;
         int scrollLength = horizontal ? l : t;
         if (mFloatViewStartIndex >= 0) {
-            mSwapViewIndex = calculateSwapViewIndex(scrollLength, horizontal);
+            mSwapViewIndex = computeSwapViewIndex(scrollLength, horizontal);
         }
         if (mPageHeaderView != null || mPageFooterView != null) {
-            resolvePageHeaderFooterOffset(scrollLength, horizontal);
+            updatePositionForHeaderAndFooter(scrollLength, horizontal);
         }
         if (mFloatViewStartMode == FLOAT_VIEW_SCROLL || mFloatViewEndMode == FLOAT_VIEW_SCROLL) {
-            resolveFloatViewOffset(scrollLength, horizontal);
+            updatePositionForFloatView(scrollLength, horizontal);
         }
         if (mPageListener != null || mPageTransformer != null) {
-            resolvePageOffset(scrollLength, getItemCount());
+            resolvePageOffset(scrollLength, getItemCount(), horizontal);
         }
     }
 
-    private int resolveScrollViewFirstViewIndex(int scrollOffset, boolean horizontal) {
+    protected int computeSwapViewIndex(int scrolled, boolean horizontal) {
+        if (mFloatViewStartIndex >= 0) {
+            int count = getChildCount(), baseLine;
+            View view = getChildAt(mFloatViewStartIndex);
+            baseLine = (horizontal ? view.getRight() : view.getBottom()) + scrolled;
+            for (int i = mFloatViewStartIndex + 1; i < count; i++) {
+                final View child = getChildAt(i);
+                if (child.getVisibility() == View.GONE || (child == mPageHeaderView || child == mPageFooterView))
+                    continue;
+                if (horizontal) {
+                    if (child.getRight() >= baseLine) {
+                        return i;
+                    }
+                } else {
+                    if (child.getBottom() >= baseLine) {
+                        return i;
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+    protected void resetPositionForFloatView(int realChildIndex, boolean horizontal) {
+        View child = realChildIndex >= 0 ? getChildAt(realChildIndex) : null;
+        if (child != null) {
+            child.setTranslationX(0);
+            child.setTranslationY(0);
+        }
+    }
+
+    private int computeFirstViewIndex(int scrollOffset, boolean horizontal) {
         int count = getChildCount();
         int minVisibleStart, maxVisibleEnd;
         int paddingStart, paddingEnd, containerSize;
@@ -1484,7 +1523,7 @@ public class PageScrollView extends ViewGroup {
         return pageItemIndex;
     }
 
-    private void resolvePageHeaderFooterOffset(int scrollLength, boolean horizontal) {
+    private void updatePositionForHeaderAndFooter(int scrollLength, boolean horizontal) {
         if (mPageHeaderView != null && mPageHeaderView.getParent() == this) {
             if (horizontal) {
                 mPageHeaderView.setTranslationX(scrollLength);
@@ -1501,7 +1540,7 @@ public class PageScrollView extends ViewGroup {
         }
     }
 
-    private void resolveFloatViewOffset(int scrolled, boolean horizontal) {
+    private void updatePositionForFloatView(int scrolled, boolean horizontal) {
         float viewTranslated;
         int wantTranslated;
         if (mFloatViewStartMode == FLOAT_VIEW_SCROLL) {
@@ -1547,8 +1586,8 @@ public class PageScrollView extends ViewGroup {
         }
     }
 
-    private void resolvePageOffset(int scrollLength, int pageItemCount) {
-        int targetOffset = computeCenterScrollOffset(mCurrItem, pageItemCount);
+    private void resolvePageOffset(int scrollLength, int pageItemCount, boolean horizontal) {
+        int targetOffset = computeScrollOffset(mCurrItem, 0, true, horizontal);
         int prevIndex = mCurrItem;
         if (scrollLength > targetOffset && prevIndex < pageItemCount - 1) {
             prevIndex++;
@@ -1561,24 +1600,24 @@ public class PageScrollView extends ViewGroup {
             minIndex = mCurrItem;
             minOffset = targetOffset;
             maxIndex = prevIndex;
-            maxOffset = maxIndex == minIndex ? minOffset : computeCenterScrollOffset(maxIndex, pageItemCount);
+            maxOffset = maxIndex == minIndex ? minOffset : computeScrollOffset(maxIndex, 0, true, horizontal);
         } else {
             maxIndex = mCurrItem;
             maxOffset = targetOffset;
             minIndex = prevIndex;
-            minOffset = minIndex == maxIndex ? maxOffset : computeCenterScrollOffset(minIndex, pageItemCount);
+            minOffset = minIndex == maxIndex ? maxOffset : computeScrollOffset(minIndex, 0, true, horizontal);
         }
         int distance = maxOffset - minOffset;
         if (distance > 0) {
             int positionOffsetPixels = scrollLength - minOffset;
             float positionOffset = positionOffsetPixels / (float) distance;
-            dispatchPageOffset(minIndex, positionOffset, positionOffsetPixels, pageItemCount);
+            dispatchTransformPosition(minIndex, positionOffset, positionOffsetPixels, pageItemCount);
         } else {
-            dispatchPageOffset(minIndex, 0, 0, pageItemCount);
+            dispatchTransformPosition(minIndex, 0, 0, pageItemCount);
         }
     }
 
-    private void dispatchPageOffset(int index, float offset, int offsetPixels, int pageItemCount) {
+    private void dispatchTransformPosition(int index, float offset, int offsetPixels, int pageItemCount) {
         if (mPageListener != null) {
             mPageListener.onPageScrolled(index, offset, offsetPixels);
         }
@@ -1629,7 +1668,7 @@ public class PageScrollView extends ViewGroup {
                             contentLength += mMiddleMargin;
                         }
                     }
-                    float transformerPosition = (scrollOffset - computeCenterScrollOffset(pageItemIndex, pageItemCount)) / (float) contentLength;
+                    float transformerPosition = (scrollOffset - computeScrollOffset(child, 0, true, horizontal)) / (float) contentLength;
                     mPageTransformer.transformPage(child, transformerPosition, horizontal);
                     translatedChildCount++;
                 } else {
@@ -1655,8 +1694,21 @@ public class PageScrollView extends ViewGroup {
         super.removeAllViewsInLayout();
         mCurrItem = 0;
         mPrevItem = -1;
+        mVirtualCount=0;
         mAttachLayout = false;
         mScrollInfo.set(-1, -1, -1, -1);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        mAttachLayout = false;
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        mAttachLayout = false;
     }
 
     private static int clamp(int n, int my, int child) {

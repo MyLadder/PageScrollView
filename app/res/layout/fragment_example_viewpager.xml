@@ -48,7 +48,7 @@
             android:textOn="footer" />
     </LinearLayout>
 
-    <com.rexy.widget.HorizontalSlideTab
+    <com.rexy.widget.PageScrollTab
         android:id="@+id/pageTabs"
         android:layout_width="match_parent"
         android:layout_height="42dp"
@@ -63,8 +63,7 @@
         rexy:tabItemDividerColor="#4790D3"
         rexy:tabItemDividerPadding="10dp"
         rexy:tabItemDividerWidth="0.45dp"
-        rexy:tabItemMinPaddingHorizonal="4dp"
-        rexy:tabItemShouldExpand="true"
+        rexy:tabItemMinPaddingHorizonal="5dp"
         rexy:tabItemTextColor="@drawable/select_tab_item_text" />
 
     <com.rexy.widget.PageScrollView

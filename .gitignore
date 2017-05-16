@@ -49,4 +49,6 @@ IGNORE/
 reports/
 node_modules/
 
+captures/
+!image/*
 IGNORE/

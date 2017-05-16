@@ -42,7 +42,8 @@ How to Usage
               android:maxHeight="900dp"
               android:orientation="horizontal" 
               android:gravity="center"                        
-              rexy:childCenter="true"                         
+              rexy:childCenter="true"
+              rexy:childFillParent="false" 
               rexy:floatViewEndIndex="-1"                          
               rexy:floatViewStartIndex="-1"                        
               rexy:middleMargin="10dp"                        
@@ -73,6 +74,9 @@ How to Usage
       //force layout all its childs gravity as Gravity.CENTER.
       scrollView.setChildCenter(true);
       
+      //if content size less than parent size , setChildFillParent as true to match parent size.
+      scrollView.setChildFillParent(true);
+            
       //set layout margin for each item between at the layout orientation.
       scrollView.setMiddleMargin(30);
       
@@ -120,6 +124,11 @@ How to Usage
      scrollView.setOnPageChangeListener(pagerScrollListener);
      ```
 
+
+[download demo apk][2]
+============
+
  [scrollview]:image/example_type_scrollview.gif "scrollview type but no need to nest a single ViewGroup,just use as a LinearLayout"
  [viewpager]:image/example_type_viewpager.gif  "viewpager type but not support PageAdapter"
  [1]:app/src/com/rexy/example/PageLayoutExampleActivity.java "activity entry"
+ [2]:image/PageScrollView.apk  "demo apk to download"

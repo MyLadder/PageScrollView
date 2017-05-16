@@ -97,7 +97,7 @@ public class ExampleActivity extends FragmentActivity implements View.OnClickLis
             setViewTypeAndOrientation(scrollView, initVertical);
             Bundle arg = new Bundle();
             arg.putBoolean(ExampleFragment.KEY_VERTICAL, initVertical);
-            Class<? extends ExampleFragment> fragmentClass = scrollView ? ExampleScrollViewFragment.class : ExamplePageViewFragment.class;
+            Class<? extends ExampleFragment> fragmentClass = scrollView ? ExampleScrollViewFragment.class : ExampleViewPagerFragment.class;
             showFragment = Fragment.instantiate(this, fragmentClass.getName(), arg);
             ft.add(R.id.fragmentContainer, showFragment, mFragmentTags[willIndex]);
         } else {

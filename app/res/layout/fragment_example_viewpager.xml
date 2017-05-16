@@ -51,11 +51,14 @@
     <com.rexy.widget.PageScrollTab
         android:id="@+id/pageTabs"
         android:layout_width="match_parent"
-        android:layout_height="42dp"
+        android:layout_height="wrap_content"
+        android:minHeight="42dp"
         android:layout_gravity="center_horizontal"
         android:background="#eee"
         android:orientation="horizontal"
-        android:textSize="15sp"
+        android:textSize="14sp"
+        rexy:tabTopLineColor="#b2bcd0"
+        rexy:tabTopLineHeight="0.5dp"
         rexy:tabBottomLineColor="#b2bcd0"
         rexy:tabBottomLineHeight="0.5dp"
         rexy:tabIndicatorColor="#5C6BC2"
@@ -64,6 +67,8 @@
         rexy:tabItemDividerPadding="10dp"
         rexy:tabItemDividerWidth="0.45dp"
         rexy:tabItemMinPaddingHorizonal="5dp"
+        rexy:tabItemMinPaddingTop="8dp"
+        rexy:tabItemMinPaddingBottom="8dp"
         rexy:tabItemTextColor="@drawable/select_tab_item_text" />
 
     <com.rexy.widget.PageScrollView

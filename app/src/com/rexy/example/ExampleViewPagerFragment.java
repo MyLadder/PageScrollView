@@ -17,7 +17,7 @@ import com.rexy.widget.PageScrollView;
  * Created by rexy on 17/5/2.
  */
 
-public class ExamplePageViewFragment extends ExampleFragment {
+public class ExampleViewPagerFragment extends ExampleFragment {
 
     PageScrollTab mSlideTab;
     ToggleButton mToggleHeader;

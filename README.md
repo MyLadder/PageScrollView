@@ -10,19 +10,23 @@ PageScrollView widget that is a customized ViewGroup having function like `Scrol
 
 **support basic function as below listed:**
 
-* layout orientation either Horizontal and Vertical .
-* scroll any child to its start and end position to be fixed .
-* interface PageTransformer , OnPageChangeListener and OnScrollChangeListener ;
-* maxWidth&maxHeight,content gravity and all of its child layout_gravity .
-* smooth scroll  any child to its start or centre with a optional offset and anim duration.
+* layout orientation either Horizontal or Vertical .
+* scroll any child to its start or end position and ceiling there.
+* work well with PageTransformer,PageChangeListener, ScrollChangeListener and VisibleRangeChangeListener;
+* maxWidth&maxHeight,content gravity and child layout_gravity .
+* smooth scroll any child to its start or centre with a optional offset and anim duration.
 
 Why to Usage
 ============
 
-  1. when you want use a simple ScrollView with some child ceiling top or bottom , or you don't like to nest a LinearLayout in it as usually,and your want a specified max width or height.
-  2. when you need use a ViewPager to display different width and height child and can make any selected item center parent,or need add a header or footer view to its edge.
-
-  so don't hesitate to use PageScrollView , it can support all above interaction requirement.
+  1. completely instead of ScrollView or HorizontalScrollView without nest a LinearLayout.
+  2. scroll any child view to top or bottom and ceiling and float there .
+  3. easy to listen on the visible index range change .
+  4. using like a ViewPager but also support child with different width and height with selected item centre in parent.
+  5. quite convenient to add a header or footer view to its edge.
+  6. support setMaxWidth and setMaxHeight and can make all child to fill parent when measured not match parent size.
+  
+  so don't hesitate to use PageScrollView , it can support all above interaction requirement and more .
    
 How to Usage
 ============
@@ -90,6 +94,7 @@ How to Usage
      //continued from above 
      scrollView.setPageHeadView(headerView);
      scrollView.setPageFooterView(footerView);
+     // set PageTransform animation .
      scrollView.setPageTransformer(new PageScrollView.PageTransformer() {
          @Override
          public void transformPage(View view, float position, boolean horizontal) {
@@ -100,6 +105,8 @@ How to Usage
              //clean your transform animation for this view.
          }
      });
+     
+     //set OnPageChangeListener like ViewPager.
      PageScrollView.OnPageChangeListener pagerScrollListener = new PageScrollView.OnPageChangeListener() {
          @Override
          public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
@@ -120,8 +127,16 @@ How to Usage
              // SCROLL_STATE_SETTLING = 2;//fling scroll started .
          }
      };
-     scrollView.setOnScrollChangeListener(pagerScrollListener);
      scrollView.setOnPageChangeListener(pagerScrollListener);
+     // set OnScrollChangeListener to watch on onScrollChanged.
+     scrollView.setOnScrollChangeListener(pagerScrollListener);
+     
+     // set OnVisibleRangeChangeListener  to watch on visible index range change
+     scrollView.setOnVisibleRangeChangeListener(new OnVisibleRangeChangeListener(){
+        public void onVisibleRangeChanged(int firstVisible, int lastVisible, int oldFirstVisible, int oldLastVisible){
+        }
+     });
+     
      ```
 
 

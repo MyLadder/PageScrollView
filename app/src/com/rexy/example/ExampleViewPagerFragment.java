@@ -42,6 +42,7 @@ public class ExampleViewPagerFragment extends ExampleFragment {
     }
 
     private void initPageTab(final PageScrollView scrollView, final PageScrollTab tabHost) {
+        scrollView.setLogEnable(true);
         final View.OnClickListener pageClick1 = new View.OnClickListener() {
             @Override
             public void onClick(View v) {

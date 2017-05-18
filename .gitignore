@@ -51,4 +51,5 @@ node_modules/
 
 captures/
 !image/*
+image/.DS_Store
 IGNORE/

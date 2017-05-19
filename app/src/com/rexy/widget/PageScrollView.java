@@ -992,29 +992,44 @@ public class PageScrollView extends ViewGroup {
         } else {
             int dx = (int) (mPointDown.x - x), dy = (int) (mPointDown.y - y);
             int dxAbs = Math.abs(dx), dyAbs = Math.abs(dy);
-            boolean dragged;
-            if (mOrientation == HORIZONTAL) {
-                dragged = dxAbs > mTouchSlop && (dxAbs * 0.6f) > dyAbs;
-                dx = (dx > 0 ? mTouchSlop : -mTouchSlop) >> 2;
-                dy = 0;
+            boolean dragged, horizontal = mOrientation == HORIZONTAL;
+            if (horizontal) {
+                if (dragged = (dxAbs > mTouchSlop && (dxAbs * 0.6f) > dyAbs)) {
+                    dx = (dx > 0 ? mTouchSlop : -mTouchSlop) >> 2;
+                    dy = 0;
+                }
             } else {
-                dragged = dyAbs > mTouchSlop && (dyAbs * 0.6f) > dxAbs;
-                dy = (dy > 0 ? mTouchSlop : -mTouchSlop) >> 2;
-                dx = 0;
+                if (dragged = (dyAbs > mTouchSlop && (dyAbs * 0.6f) > dxAbs)) {
+                    dy = (dy > 0 ? mTouchSlop : -mTouchSlop) >> 2;
+                    dx = 0;
+                }
+            }
+            if (!dragged) {
+                if (Math.max(dxAbs, dyAbs) > (mTouchSlop << 2)) {
+                    dx = (int) (mPointLast.x - x);
+                    dy = (int) (mPointLast.y - y);
+                    dxAbs = Math.abs(dx);
+                    dyAbs = Math.abs(dy);
+                    if (horizontal && (dxAbs * 0.6f) > dyAbs) {
+                        mPointDown.set(mPointLast);
+                    }
+                    if (!horizontal && (dyAbs * 0.6f) > dxAbs) {
+                        mPointDown.set(mPointLast);
+                    }
+                }
             }
             if (dragged) {
                 markAsWillDragged();
                 scrollDxDy(dx, dy);
-                mPointLast.set(x, y);
             }
+            mPointLast.set(x, y);
         }
     }
 
     private void handleTouchActionUp(MotionEvent ev) {
         if (mIsBeingDragged) {
             mIsBeingDragged = false;
-            mPointLast.x = ev.getX();
-            mPointLast.y = ev.getY();
+            mPointLast.set(ev.getX(), ev.getY());
             int velocityX = 0, velocityY = 0;
             final VelocityTracker velocityTracker = mVelocityTracker;
             if (velocityTracker != null) {

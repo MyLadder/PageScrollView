@@ -18,9 +18,6 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
-import android.view.animation.Animation;
-import android.view.animation.LinearInterpolator;
-import android.view.animation.Transformation;
 import android.widget.Checkable;
 import android.widget.TextView;
 
@@ -249,8 +246,8 @@ public class PageScrollTab extends PageScrollView {
         if (mLocalInfo == null) {
             mLocalInfo = getResources().getConfiguration().locale;
         }
-        mItemLayoutParams=new PageScrollView.LayoutParams(-2,-2,Gravity.CENTER_VERTICAL);
-        setGravity(Gravity.CENTER_VERTICAL|getGravity());
+        mItemLayoutParams = new PageScrollView.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL);
+        setGravity(Gravity.CENTER_VERTICAL | getGravity());
     }
 
     public int getTabItemCount() {
@@ -366,7 +363,7 @@ public class PageScrollTab extends PageScrollView {
         int right = Math.max(mItemMinPaddingHorizonal, tab.getPaddingRight());
         int bottom = Math.max(mItemMinPaddingBottom, tab.getPaddingBottom());
         tab.setPadding(left, top, right, bottom);
-        addView(tab, position,mItemLayoutParams);
+        addView(tab, position, mItemLayoutParams);
     }
 
     public void addTabItem(CharSequence title, boolean updateStyle) {
@@ -432,7 +429,7 @@ public class PageScrollTab extends PageScrollView {
         if (isInEditMode() || itemCount == 0) {
             return;
         }
-        int width = getWidth(),height = getHeight();
+        int width = getWidth(), height = getHeight();
 
         // draw divider
         if (mDividerWidth > 0) {
@@ -574,7 +571,7 @@ public class PageScrollTab extends PageScrollView {
 
     public View getSelectedView() {
         if (mCurrentPosition >= 0 && mCurrentPosition < getTabItemCount()) {
-            return getVirtualChildAt(mCurrentPosition,true);
+            return getVirtualChildAt(mCurrentPosition, true);
         }
         return null;
     }
@@ -759,44 +756,5 @@ public class PageScrollTab extends PageScrollView {
                 return new SavedState[size];
             }
         };
-    }
-
-
-    public void autoScroll(int from, int to, Animation.AnimationListener l) {
-        int childCount = getItemCount();
-        if (from >= 0 && to >= 0 && (from < childCount && to < childCount)) {
-            if (getAnimation() != null) {
-                getAnimation().cancel();
-                clearAnimation();
-            }
-            boolean horizontal = mOrientation == HORIZONTAL;
-            int scrollFrom = computeScrollOffset(getVirtualChildAt(from, true), 0, false, horizontal);
-            int scrollTo = computeScrollOffset(getVirtualChildAt(to, true), 0, false, horizontal);
-            if (scrollTo != scrollFrom) {
-                int absDx = Math.abs(scrollTo - scrollFrom);
-                CustScrollAnima anim = new CustScrollAnima(scrollFrom, scrollTo);
-                int measureWidth = getMeasuredWidth();
-                if (measureWidth == 0) {
-                    measureWidth = Math.max(getSuggestedMinimumWidth(), 1);
-                }
-                anim.setDuration(Math.min(4000, absDx * 1800 / measureWidth));
-                anim.setInterpolator(new LinearInterpolator());
-                anim.setAnimationListener(l);
-                startAnimation(anim);
-            }
-        }
-    }
-
-    class CustScrollAnima extends Animation {
-        private int mScrollFrom, mScrollTo;
-        public CustScrollAnima(int from, int to) {
-            mScrollFrom = from;
-            mScrollTo = to;
-        }
-        @Override
-        protected void applyTransformation(float interpolatedTime, Transformation t) {
-            int current = (int) (mScrollFrom + (mScrollTo - mScrollFrom) * interpolatedTime);
-            scrollTo(current, 0);
-        }
     }
 }

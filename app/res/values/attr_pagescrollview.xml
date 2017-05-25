@@ -2,10 +2,7 @@
 <resources>
     <declare-styleable name="PageScrollView">
         <attr name="android:orientation"/>
-        <attr name="android:gravity"/>
         <attr name="android:layout_gravity"/>
-        <attr name="android:maxWidth"/>
-        <attr name="android:maxHeight"/>
         <attr name="middleMargin" format="dimension"/>
         <attr name="sizeFixedPercent" format="float"/>
         <attr name="overFlingDistance" format="dimension"/>

@@ -33,6 +33,7 @@ public class ExampleScrollViewFragment extends ExampleFragment {
         mToggleFloatEnd = (ToggleButton) root.findViewById(R.id.toggleFloatEnd);
         mToggleFloatStart.setOnCheckedChangeListener(this);
         mToggleFloatEnd.setOnCheckedChangeListener(this);
+        mPageScrollView.setLogTag("scrollView");
         initPageScrollViewItemClick(mPageScrollView);
     }
 

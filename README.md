@@ -140,41 +140,48 @@ How to Usage
      ```
 
 
-# More powerful expand PageScrollTab extends PageScrollView
->`PageScrollTab` is a extended container from `PageScrollView` just like `SlidingTabStrip` 
- it support tab style behavior , easy combine together with ViewPager and work well.
- ``` xml
-     <declare-styleable name="PageScrollTab">
-         <!--tab item 的背景-->
-         <attr name="tabItemBackground" format="reference"/>
-         <attr name="tabItemBackgroundFirst" format="reference"/>
-         <attr name="tabItemBackgroundLast" format="reference"/>
-         <attr name="tabItemBackgroundFull" format="reference"/>
-         <!--底部指示线-->
-         <attr name="tabIndicatorColor" format="color"/>
-         <attr name="tabIndicatorHeight" format="dimension"/>
-         <attr name="tabIndicatorOffset" format="dimension"/>
-         <attr name="tabIndicatorWidthPercent" format="float"/>
-         <!--顶部水平分界线-->
-         <attr name="tabTopLineColor" format="color"/>
-         <attr name="tabTopLineHeight" format="dimension"/>
-         <!--底部水平分界线-->
-         <attr name="tabBottomLineColor" format="color"/>
-         <attr name="tabBottomLineHeight" format="dimension"/>
-         <!-- item 之间垂直分割线-->
-         <attr name="tabItemDividerColor" format="color"/>
-         <attr name="tabItemDividerWidth" format="dimension"/>
-         <attr name="tabItemDividerPadding" format="dimension"/>
-         <!-- item 的最小 Padding 设置-->
-         <attr name="tabItemMinPaddingHorizontal" format="dimension"/>
-         <attr name="tabItemMinPaddingTop" format="dimension"/>
-         <attr name="tabItemMinPaddingBottom" format="dimension"/>
-         <!--item文字大写开-->
-         <attr name="tabItemTextCaps" format="boolean"/>
-         <!--item 文字颜色-->
-         <attr name="tabItemTextColor" format="reference"/>
-     </declare-styleable>
-     ```
+More powerful expand PageScrollTab extends PageScrollView
+====================
+
+
+### `PageScrollTab` is a extended container from `PageScrollView` just like `SlidingTabStrip` . it support tab style behavior , easy combine together with ViewPager and work well.
+ 1. support attr properties , and can also use java api to set these properties.
+    ``` xml
+    <declare-styleable name="PageScrollTab">
+        <!--tab item 的背景-->
+        <attr name="tabItemBackground" format="reference"/>
+        <attr name="tabItemBackgroundFirst" format="reference"/>
+        <attr name="tabItemBackgroundLast" format="reference"/>
+        <attr name="tabItemBackgroundFull" format="reference"/>
+        <!--底部指示线-->
+        <attr name="tabIndicatorColor" format="color"/>
+        <attr name="tabIndicatorHeight" format="dimension"/>
+        <attr name="tabIndicatorOffset" format="dimension"/>
+        <attr name="tabIndicatorWidthPercent" format="float"/>
+        <!--顶部水平分界线-->
+        <attr name="tabTopLineColor" format="color"/>
+        <attr name="tabTopLineHeight" format="dimension"/>
+        <!--底部水平分界线-->
+        <attr name="tabBottomLineColor" format="color"/>
+        <attr name="tabBottomLineHeight" format="dimension"/>
+        <!-- item 之间垂直分割线-->
+        <attr name="tabItemDividerColor" format="color"/>
+        <attr name="tabItemDividerWidth" format="dimension"/>
+        <attr name="tabItemDividerPadding" format="dimension"/>
+        <!-- item 的最小 Padding 设置-->
+        <attr name="tabItemMinPaddingHorizontal" format="dimension"/>
+        <attr name="tabItemMinPaddingTop" format="dimension"/>
+        <attr name="tabItemMinPaddingBottom" format="dimension"/>
+        <!--item文字大写开-->
+        <attr name="tabItemTextCaps" format="boolean"/>
+        <!--item 文字颜色-->
+        <attr name="tabItemTextColor" format="reference"/>
+    </declare-styleable>
+    ```
+
+2. use PageScrollTab
+
+   PageScrollTab.setViewPager or setViewPager.setTabProvider ...
 
 
 [download demo apk][2]
@@ -182,5 +189,5 @@ How to Usage
 
  [scrollview]:image/example_type_scrollview.gif "scrollview type but no need to nest a single ViewGroup,just use as a LinearLayout"
  [viewpager]:image/example_type_viewpager.gif  "viewpager type but not support PageAdapter"
- [1]:app/src/com/rexy/example/PageLayoutExampleActivity.java "activity entry"
+ [1]:app/src/com/rexy/example/ExampleActivity.java "activity entry"
  [2]:image/PageScrollView.apk  "demo apk to download"

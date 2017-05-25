@@ -11,6 +11,8 @@
         <!--底部指示线-->
         <attr name="tabIndicatorColor" format="color"/>
         <attr name="tabIndicatorHeight" format="dimension"/>
+        <attr name="tabIndicatorOffset" format="dimension"/>
+        <attr name="tabIndicatorWidthPercent" format="float"/>
 
         <!--顶部水平分界线-->
         <attr name="tabTopLineColor" format="color"/>
@@ -27,7 +29,7 @@
 
 
         <!-- item 的最小 Padding 设置-->
-        <attr name="tabItemMinPaddingHorizonal" format="dimension"/>
+        <attr name="tabItemMinPaddingHorizontal" format="dimension"/>
         <attr name="tabItemMinPaddingTop" format="dimension"/>
         <attr name="tabItemMinPaddingBottom" format="dimension"/>
 

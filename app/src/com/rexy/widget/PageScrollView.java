@@ -5,6 +5,7 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.support.v4.util.Pools;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
@@ -22,8 +23,16 @@ import android.widget.OverScroller;
 
 import com.rexy.pagescrollview.R;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+
 /**
- * TODO:功能说明
+ * A customized scroll container support both Horizontal and Vertical layout and gesture.
+ * support both scroll style of ScrollView and ViewPager and also their interfaces .
+ * support float any view to its start and end position .
  *
  * @author: renzheng
  * @date: 2017-04-25 09:32
@@ -96,6 +105,12 @@ public class PageScrollView extends ViewGroup {
     PageTransformer mPageTransformer;
     OnPageChangeListener mPageListener = null;
     OnVisibleRangeChangeListener mOnVisibleRangeChangeListener = null;
+
+
+    private Comparator<PointF> mComparator;
+    private List<PointF> mPairList;
+    private static final Pools.SimplePool<PointF> sPairPools = new Pools.SimplePool(8);
+
 
     public PageScrollView(Context context) {
         super(context);
@@ -556,31 +571,13 @@ public class PageScrollView extends ViewGroup {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         boolean horizontal = mOrientation == HORIZONTAL;
         dispatchMeasure(widthMeasureSpec, heightMeasureSpec, horizontal);
-        if (isChildFillParent) {
+        if (isChildFillParent&&mVirtualCount>0) {
             int selfWidth = getMeasuredWidth(), selfHeight = getMeasuredHeight();
             int contentWidthWithPadding = mContentWidth + getPaddingLeft() + getPaddingRight();
             int contentHeightWithPadding = mContentHeight + getPaddingTop() + getPaddingBottom();
             int adjustTotal = horizontal ? (selfWidth - contentWidthWithPadding) : (selfHeight - contentHeightWithPadding);
-            if (adjustTotal > 0 && adjustTotal > mVirtualCount) {
-                int adjustSize = adjustTotal / mVirtualCount, childCount = getChildCount();
-                adjustTotal = adjustSize * mVirtualCount;
-                for (int i = 0; i < childCount; i++) {
-                    final View child = getChildAt(i);
-                    if (child.getVisibility() == View.GONE || (child == mPageHeaderView || child == mPageFooterView))
-                        continue;
-                    int fillWidth = child.getMeasuredWidth(), fillHeight = child.getMeasuredHeight();
-                    if (horizontal) {
-                        fillWidth += adjustSize;
-                    } else {
-                        fillHeight += adjustSize;
-                    }
-                    child.measure(MeasureSpec.makeMeasureSpec(fillWidth, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(fillHeight, MeasureSpec.EXACTLY));
-                }
-                if (horizontal) {
-                    mContentWidth += adjustTotal;
-                } else {
-                    mContentHeight += adjustTotal;
-                }
+            if (adjustTotal > mVirtualCount) {
+                adjustMatchParentMeasure(adjustTotal, horizontal);
             }
         }
         measureFloatViewStart(mFloatViewStart, mVirtualCount);
@@ -626,7 +623,7 @@ public class PageScrollView extends ViewGroup {
             }
         }
         int maxWidth = Math.max(mContentWidth + paddingHorizontal, getSuggestedMinimumWidth());
-        int maxHeight = Math.max(mContentHeight + paddingVertical, getSuggestedMinimumWidth());
+        int maxHeight = Math.max(mContentHeight + paddingVertical, getSuggestedMinimumHeight());
         if (mMaxWidth > 0 && maxWidth > mMaxWidth) {
             maxWidth = mMaxWidth;
         }
@@ -735,6 +732,100 @@ public class PageScrollView extends ViewGroup {
         mContentWidth = Math.max(mContentWidth, contentWidth);
         mContentHeight += contentHeight;
         return childState;
+    }
+
+    private void destroyCacheMeasureSize() {
+        Iterator<PointF> its = mPairList.iterator();
+        while (its.hasNext()) {
+            PointF it = its.next();
+            sPairPools.release(it);
+            its.remove();
+        }
+    }
+
+    private int buildCacheMeasureSize(int childCount, boolean horizontal) {
+        if (mPairList == null) {
+            mPairList = new ArrayList(8);
+            mComparator = new Comparator<PointF>() {
+                @Override
+                public int compare(PointF l, PointF r) {
+                    return Float.compare(l.y, r.y);
+                }
+            };
+        } else {
+            destroyCacheMeasureSize();
+        }
+        for (int i = 0; i < childCount; i++) {
+            final View child = getChildAt(i);
+            if (child.getVisibility() == View.GONE || (child == mPageHeaderView || child == mPageFooterView))
+                continue;
+            PointF pair = sPairPools.acquire();
+            if (pair == null) {
+                pair = new PointF();
+            }
+            if (horizontal) {
+                pair.set(i, child.getMeasuredWidth() + ((PageScrollView.LayoutParams) child.getLayoutParams()).getMarginHorizontal());
+            } else {
+                pair.set(i, child.getMeasuredHeight() + ((PageScrollView.LayoutParams) child.getLayoutParams()).getMarginVertical());
+            }
+            mPairList.add(pair);
+        }
+        return mPairList.size();
+    }
+
+    private void adjustMatchMeasureSize(int matchSize, float space) {
+        Collections.sort(mPairList, mComparator);
+        int startIndex = 0;
+        while (space > 1) {
+            int diffIndex = -1;
+            PointF start = mPairList.get(startIndex), current = null;
+            for (int i = startIndex + 1; i < matchSize; i++) {
+                current = mPairList.get(i);
+                if (current.y > start.y) {
+                    diffIndex = i;
+                    break;
+                }
+            }
+            if (diffIndex == -1) {
+                float addedSize = space / matchSize;
+                for (PointF point : mPairList) {
+                    point.y = point.y + addedSize;
+                }
+                space = 0;
+            } else {
+                float addedSize = Math.min(current.y - start.y, space / diffIndex);
+                for (int i = 0; i < diffIndex; i++) {
+                    start = mPairList.get(i);
+                    start.y = start.y + addedSize;
+                }
+                space = space - (addedSize * diffIndex);
+                startIndex = diffIndex;
+            }
+        }
+    }
+
+    private void adjustMatchParentMeasure(float space, boolean horizontal) {
+        final int matchSize = buildCacheMeasureSize(getChildCount(), horizontal), addedTotalSize = (int) space;
+        if (matchSize > 0) {
+            adjustMatchMeasureSize(matchSize, space);
+            for (PointF point : mPairList) {
+                View child = getChildAt((int) point.x);
+                int goodSize = (int) point.y;
+                if (horizontal) {
+                    goodSize = goodSize - ((PageScrollView.LayoutParams) child.getLayoutParams()).getMarginHorizontal();
+                    child.measure(MeasureSpec.makeMeasureSpec(goodSize, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(child.getMeasuredHeight(), MeasureSpec.EXACTLY));
+                } else {
+                    goodSize = goodSize - ((PageScrollView.LayoutParams) child.getLayoutParams()).getMarginVertical();
+                    child.measure(MeasureSpec.makeMeasureSpec(child.getMeasuredWidth(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(goodSize, MeasureSpec.EXACTLY));
+                }
+            }
+            if (horizontal) {
+                mContentWidth += addedTotalSize;
+            } else {
+                mContentHeight += addedTotalSize;
+            }
+            destroyCacheMeasureSize();
+        }
     }
 
     protected int getContentStart(int containerStart, int containerEnd, int contentWillSize, int contentGravity, boolean horizontalDirection) {

@@ -13,11 +13,15 @@ import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
+import android.view.animation.Animation;
+import android.view.animation.LinearInterpolator;
+import android.view.animation.Transformation;
 import android.widget.Checkable;
 import android.widget.TextView;
 
@@ -28,30 +32,9 @@ import java.util.Locale;
 
 public class PageScrollTab extends PageScrollView {
 
-    public interface ITabProvider {
-        CharSequence getPageTitle(int position);
-
-        Object getItem(int pos);
-
-        int getCount();
-    }
-
-    public interface ViewTabProvider extends ITabProvider {
-        int getItemViewType(int pos);
-
-        View getView(Context cx, LayoutInflater lf, int pos);
-    }
-
-    public interface ITabClickEvent {
-        boolean onTabClicked(PageScrollTab parent, View cur, int curPos, View pre, int prePos);
-    }
-
-
     private static int TAB_INDEX = R.id.key_special_0;
-    // @formatter:off
     private static final int[] ATTRS = new int[]{android.R.attr.textSize,
             android.R.attr.textColor};
-    // @formatter:on
 
     /**
      * 以下和
@@ -59,12 +42,12 @@ public class PageScrollTab extends PageScrollView {
     private int mCurrentPosition = 0; //当前选中的tab 索引。
     private float mCurrentPositionOffset = 0f;//选中tab 的偏移量子。
 
-    private PageScrollView.LayoutParams mItemLayoutParams;
+
 
     /**
      * 以下是设置tab item 的最小padding 值。
      */
-    private int mItemMinPaddingHorizonal = 10;
+    private int mItemMinPaddingHorizontal = 10;
     private int mItemMinPaddingTop = 0;
     private int mItemMinPaddingBottom = 0;
 
@@ -84,9 +67,8 @@ public class PageScrollTab extends PageScrollView {
     private int mTextColor = 0xFF666666;
     private int mTextColorResId = 0;
 
-    private Paint rectPaint;
-    private Paint dividerPaint;
-
+    private Paint mRectPaint;
+    private Paint mDividerPaint;
 
     /**
      * item 之间垂直分割线。
@@ -100,13 +82,9 @@ public class PageScrollTab extends PageScrollView {
      * 选中item 底部指示线。
      */
     private int mIndicatorHeight = 2;
+    private int mIndicatorOffset = 0;
     private int mIndicatorColor = 0xffff9500;
-
-    /**
-     * 底部水平分界线
-     */
-    private int mBottomLineHeight = 0;
-    private int mBottomLineColor = 0x1A000000;
+    private float mIndicatorWidthPercent = 1;
 
     /**
      * 顶部水平分界线。
@@ -114,17 +92,23 @@ public class PageScrollTab extends PageScrollView {
     private int mTopLineHeight = 0;
     private int mTopLineColor = 0xffd8e2e9;
 
+    /**
+     * 底部水平分界线
+     */
+    private int mBottomLineHeight = 0;
+    private int mBottomLineColor = 0x1A000000;
+
     private Locale mLocalInfo;
     private boolean mAutoCheckState = true;
     private View mPreCheckView = null;
-
+    private PageScrollView.LayoutParams mItemLayoutParams;
 
     //c
     private ViewPager mViewPager = null;
     private final PageListener mViewPageListener = new PageListener();
     public ViewPager.OnPageChangeListener mDelegatePageListener;
 
-    protected ITabProvider mITabProvider = null;
+    protected ItemProvider mITabProvider = null;
     protected ITabClickEvent mTabClick = null;
     private OnClickListener mTabItemClick = new OnClickListener() {
         @Override
@@ -173,7 +157,7 @@ public class PageScrollTab extends PageScrollView {
                 mBottomLineHeight, dm);
         mDividerPadding = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
                 mDividerPadding, dm);
-        mItemMinPaddingHorizonal = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, mItemMinPaddingHorizonal, dm);
+        mItemMinPaddingHorizontal = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, mItemMinPaddingHorizontal, dm);
         mItemMinPaddingTop = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, mItemMinPaddingTop, dm);
         mItemMinPaddingBottom = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, mItemMinPaddingBottom, dm);
         mDividerWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, mDividerWidth,
@@ -204,6 +188,9 @@ public class PageScrollTab extends PageScrollView {
                 mIndicatorColor);
         mIndicatorHeight = a.getDimensionPixelSize(
                 R.styleable.PageScrollTab_tabIndicatorHeight, mIndicatorHeight);
+        mIndicatorOffset = a.getDimensionPixelSize(
+                R.styleable.PageScrollTab_tabIndicatorOffset, mIndicatorOffset);
+        float atrIndicatorWidthPercent = a.getFloat(R.styleable.PageScrollTab_tabIndicatorWidthPercent, mIndicatorWidthPercent);
 
 
         mTopLineColor = a.getColor(R.styleable.PageScrollTab_tabTopLineColor,
@@ -223,8 +210,8 @@ public class PageScrollTab extends PageScrollView {
                 R.styleable.PageScrollTab_tabItemDividerPadding, mDividerPadding);
 
 
-        mItemMinPaddingHorizonal = a.getDimensionPixelSize(
-                R.styleable.PageScrollTab_tabItemMinPaddingHorizonal, mItemMinPaddingHorizonal);
+        mItemMinPaddingHorizontal = a.getDimensionPixelSize(
+                R.styleable.PageScrollTab_tabItemMinPaddingHorizontal, mItemMinPaddingHorizontal);
         mItemMinPaddingTop = a.getDimensionPixelSize(
                 R.styleable.PageScrollTab_tabItemMinPaddingTop, mItemMinPaddingTop);
         mItemMinPaddingBottom = a.getDimensionPixelSize(
@@ -235,19 +222,20 @@ public class PageScrollTab extends PageScrollView {
                 mTextColorResId);
         a.recycle();
 
-        rectPaint = new Paint();
-        rectPaint.setAntiAlias(true);
-        rectPaint.setStyle(Style.FILL);
+        mRectPaint = new Paint();
+        mRectPaint.setAntiAlias(true);
+        mRectPaint.setStyle(Style.FILL);
 
-        dividerPaint = new Paint();
-        dividerPaint.setAntiAlias(true);
-        dividerPaint.setStrokeWidth(mDividerWidth);
+        mDividerPaint = new Paint();
+        mDividerPaint.setAntiAlias(true);
+        mDividerPaint.setStrokeWidth(mDividerWidth);
 
         if (mLocalInfo == null) {
             mLocalInfo = getResources().getConfiguration().locale;
         }
-        mItemLayoutParams = new PageScrollView.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL);
-        setGravity(Gravity.CENTER_VERTICAL | getGravity());
+        mItemLayoutParams=new PageScrollView.LayoutParams(-2,-2,Gravity.CENTER_VERTICAL);
+        setGravity(Gravity.CENTER_VERTICAL|getGravity());
+        setIndicatorWidthPercent(atrIndicatorWidthPercent);
     }
 
     public int getTabItemCount() {
@@ -260,12 +248,12 @@ public class PageScrollTab extends PageScrollView {
         return getItemCount();
     }
 
-    public ITabProvider getTabProvider() {
+    public ItemProvider getTabProvider() {
         if (mITabProvider != null) {
             return mITabProvider;
         }
-        if (mViewPager != null && mViewPager.getAdapter() instanceof ITabProvider) {
-            return (ITabProvider) mViewPager.getAdapter();
+        if (mViewPager != null && mViewPager.getAdapter() instanceof ItemProvider) {
+            return (ItemProvider) mViewPager.getAdapter();
         }
         return null;
     }
@@ -274,15 +262,15 @@ public class PageScrollTab extends PageScrollView {
         mViewPager = pager;
         PagerAdapter adp = pager == null ? null : pager.getAdapter();
         if (adp != null) {
-            if (adp instanceof ITabProvider) {
-                mITabProvider = (ITabProvider) adp;
+            if (adp instanceof ItemProvider) {
+                mITabProvider = (ItemProvider) adp;
             }
             pager.setOnPageChangeListener(mViewPageListener);
         }
         notifyDataSetChanged();
     }
 
-    public void setTabProvider(ITabProvider provider, int currentPosition) {
+    public void setTabProvider(ItemProvider provider, int currentPosition) {
         mITabProvider = provider;
         this.mCurrentPosition = currentPosition;
         notifyDataSetChanged();
@@ -296,7 +284,6 @@ public class PageScrollTab extends PageScrollView {
         this.mDelegatePageListener = listener;
     }
 
-
     public void notifyDataSetChanged() {
         removeAllViews();
         int tabItemCount = getTabItemCount();
@@ -306,15 +293,14 @@ public class PageScrollTab extends PageScrollView {
         if (!accessToTabProvider && !accessToViewPage) {
             return;
         } else {
-            isViewTab = (accessToTabProvider && mITabProvider instanceof ViewTabProvider);
+            isViewTab = (accessToTabProvider && mITabProvider instanceof ItemProvider.ViewProvider);
         }
-        LayoutInflater inflater = LayoutInflater.from(getContext());
         for (int i = 0; i < tabItemCount; i++) {
             if (isViewTab) {
-                addTab(i, ((ViewTabProvider) mITabProvider).getView(getContext(), inflater, i));
+                addTab(i, ((ItemProvider.ViewProvider) mITabProvider).getView(i,null,PageScrollTab.this));
             } else {
-                CharSequence tabLable = accessToTabProvider ? (mITabProvider.getPageTitle(i)) : (mViewPager.getAdapter().getPageTitle(i));
-                addTextTab(i, tabLable);
+                CharSequence label = accessToTabProvider ? (mITabProvider.getTitle(i)) : (mViewPager.getAdapter().getPageTitle(i));
+                addTextTab(i, label);
             }
         }
         updateTabStyles();
@@ -358,12 +344,12 @@ public class PageScrollTab extends PageScrollView {
         tab.setFocusable(true);
         tab.setTag(TAB_INDEX, position);
         tab.setOnClickListener(mTabItemClick);
-        int left = Math.max(mItemMinPaddingHorizonal, tab.getPaddingLeft());
+        int left = Math.max(mItemMinPaddingHorizontal, tab.getPaddingLeft());
         int top = Math.max(mItemMinPaddingTop, tab.getPaddingTop());
-        int right = Math.max(mItemMinPaddingHorizonal, tab.getPaddingRight());
+        int right = Math.max(mItemMinPaddingHorizontal, tab.getPaddingRight());
         int bottom = Math.max(mItemMinPaddingBottom, tab.getPaddingBottom());
         tab.setPadding(left, top, right, bottom);
-        addView(tab, position, mItemLayoutParams);
+        addView(tab, position,mItemLayoutParams);
     }
 
     public void addTabItem(CharSequence title, boolean updateStyle) {
@@ -429,32 +415,32 @@ public class PageScrollTab extends PageScrollView {
         if (isInEditMode() || itemCount == 0) {
             return;
         }
-        int width = getWidth(), height = getHeight();
+        int width = getWidth(),height = getHeight();
 
         // draw divider
         if (mDividerWidth > 0) {
-            dividerPaint.setColor(mDividerColor);
-            float dividerXOffset = dividerPaint.getStrokeWidth() / 2;
+            mDividerPaint.setColor(mDividerColor);
+            float dividerXOffset = mDividerPaint.getStrokeWidth() / 2;
             for (int i = 0; i < itemCount - 1; i++) {
                 View tab = getVirtualChildAt(i, true);
                 float startX = tab.getRight() + dividerXOffset;
-                canvas.drawLine(startX, mDividerPadding, startX, height - mDividerPadding, dividerPaint);
+                canvas.drawLine(startX, mDividerPadding, startX, height - mDividerPadding, mDividerPaint);
             }
         }
 
         // draw top or bottom line.
         if (mBottomLineHeight > 0) {
-            rectPaint.setColor(mBottomLineColor);
-            canvas.drawRect(0, height - mBottomLineHeight, width, height, rectPaint);
+            mRectPaint.setColor(mBottomLineColor);
+            canvas.drawRect(0, height - mBottomLineHeight, width, height, mRectPaint);
         }
         if (mTopLineHeight > 0) {
-            rectPaint.setColor(mTopLineColor);
-            canvas.drawRect(0, 0, width, mTopLineHeight, rectPaint);
+            mRectPaint.setColor(mTopLineColor);
+            canvas.drawRect(0, 0, width, mTopLineHeight, mRectPaint);
         }
 
         // draw indicator line
-        if (mIndicatorHeight > 0) {
-            rectPaint.setColor(mIndicatorColor);
+        if (mIndicatorHeight > 0 && mIndicatorWidthPercent > 0) {
+            mRectPaint.setColor(mIndicatorColor);
             // default: line below current tab
             View currentTab = getVirtualChildAt(mCurrentPosition, true);
             float lineLeft = currentTab.getLeft();
@@ -469,7 +455,15 @@ public class PageScrollTab extends PageScrollView {
                 lineRight = (mCurrentPositionOffset * nextTabRight + (1f - mCurrentPositionOffset)
                         * lineRight);
             }
-            canvas.drawRect(lineLeft, height - mIndicatorHeight, lineRight, height, rectPaint);
+            if (mIndicatorOffset != 0) {
+                height -= mIndicatorOffset;
+            }
+            if (mIndicatorWidthPercent >= 1) {
+                canvas.drawRect(lineLeft, height - mIndicatorHeight, lineRight, height, mRectPaint);
+            } else {
+                float offsetSize = (lineRight - lineLeft) * (1 - mIndicatorWidthPercent);
+                canvas.drawRect(lineLeft + offsetSize, height - mIndicatorHeight, lineRight - offsetSize, height, mRectPaint);
+            }
             // draw underline
         }
     }
@@ -571,9 +565,44 @@ public class PageScrollTab extends PageScrollView {
 
     public View getSelectedView() {
         if (mCurrentPosition >= 0 && mCurrentPosition < getTabItemCount()) {
-            return getVirtualChildAt(mCurrentPosition, true);
+            return getVirtualChildAt(mCurrentPosition,true);
         }
         return null;
+    }
+
+    public <T extends View> SparseArray<T> findTabViewByClass(Class<T> cls, int from, int endExclude) {
+        int size = getChildCount();
+        int start = from > 0 ? from : 0;
+        int end = (endExclude <= 0 || endExclude > size) ? size : endExclude;
+        SparseArray<T> result = new SparseArray(size + 1);
+        while (start < end) {
+            View itemView = getChildAt(start);
+            if (cls.isAssignableFrom(itemView.getClass())) {
+                result.put(start, (T) itemView);
+            }
+            start++;
+        }
+        return result;
+    }
+
+    public void setIndicatorWidthPercent(float widthPercent) {
+        if (widthPercent != mIndicatorWidthPercent) {
+            if (widthPercent >= 1) {
+                widthPercent = 1;
+            }
+            if (widthPercent < 0) {
+                widthPercent = 0;
+            }
+            if (widthPercent != mIndicatorWidthPercent) {
+                mIndicatorWidthPercent = widthPercent;
+                invalidate();
+            }
+        }
+    }
+
+    public void setIndicatorOffset(int indicatorOffsetPx) {
+        this.mIndicatorOffset = indicatorOffsetPx;
+        invalidate();
     }
 
     public void setIndicatorHeight(int indicatorLineHeightPx) {
@@ -700,7 +729,7 @@ public class PageScrollTab extends PageScrollView {
     }
 
     public void setItemPaddingHorizonal(int paddingHorizonalPixel) {
-        this.mItemMinPaddingHorizonal = paddingHorizonalPixel;
+        this.mItemMinPaddingHorizontal = paddingHorizonalPixel;
     }
 
     public void setItemPaddingTop(int paddingTopPixel) {
@@ -709,6 +738,31 @@ public class PageScrollTab extends PageScrollView {
 
     public void setItemPaddingBottom(int paddingBottomPixel) {
         this.mItemMinPaddingBottom = paddingBottomPixel;
+    }
+
+    public void smoothScroll(int from, int to, Animation.AnimationListener l) {
+        int childCount = getItemCount();
+        if (from >= 0 && to >= 0 && (from < childCount && to < childCount)) {
+            if (getAnimation() != null) {
+                getAnimation().cancel();
+                clearAnimation();
+            }
+            boolean horizontal = mOrientation == HORIZONTAL;
+            int scrollFrom = computeScrollOffset(getVirtualChildAt(from, true), 0, false, horizontal);
+            int scrollTo = computeScrollOffset(getVirtualChildAt(to, true), 0, false, horizontal);
+            if (scrollTo != scrollFrom) {
+                int absDx = Math.abs(scrollTo - scrollFrom);
+                ScrollAnimation anim = new ScrollAnimation(scrollFrom, scrollTo);
+                int measureWidth = getMeasuredWidth();
+                if (measureWidth == 0) {
+                    measureWidth = Math.max(getSuggestedMinimumWidth(), 1);
+                }
+                anim.setDuration(Math.min(4000, absDx * 1800 / measureWidth));
+                anim.setInterpolator(new LinearInterpolator());
+                anim.setAnimationListener(l);
+                startAnimation(anim);
+            }
+        }
     }
 
     @Override
@@ -756,5 +810,23 @@ public class PageScrollTab extends PageScrollView {
                 return new SavedState[size];
             }
         };
+    }
+
+    public interface ITabClickEvent {
+        boolean onTabClicked(PageScrollTab parent, View cur, int curPos, View pre, int prePos);
+    }
+
+    class ScrollAnimation extends Animation {
+        private int mScrollFrom, mScrollTo;
+
+        public ScrollAnimation(int from, int to) {
+            mScrollFrom = from;
+            mScrollTo = to;
+        }
+        @Override
+        protected void applyTransformation(float time, Transformation t) {
+            int current = (int) (mScrollFrom + (mScrollTo - mScrollFrom) * time);
+            scrollTo(current, 0);
+        }
     }
 }

@@ -66,7 +66,7 @@
         rexy:tabItemDividerColor="#4790D3"
         rexy:tabItemDividerPadding="10dp"
         rexy:tabItemDividerWidth="0.45dp"
-        rexy:tabItemMinPaddingHorizonal="5dp"
+        rexy:tabItemMinPaddingHorizontal="5dp"
         rexy:tabItemMinPaddingTop="8dp"
         rexy:tabItemMinPaddingBottom="8dp"
         rexy:tabItemTextColor="@drawable/select_tab_item_text" />

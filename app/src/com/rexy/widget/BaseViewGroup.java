@@ -10,6 +10,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
 /**
  * @author: renzheng
@@ -19,8 +21,9 @@ public abstract class BaseViewGroup extends ViewGroup {
     public static final int SCROLL_STATE_IDLE = 0;
     public static final int SCROLL_STATE_DRAGGING = 1;
     public static final int SCROLL_STATE_SETTLING = 2;
-    private static final int[] ATTRS_MAX_SIZE_GRAVITY = new int[]
+    private static final int[] ATTRS_PROPERTIES = new int[]
             {android.R.attr.gravity, android.R.attr.maxWidth, android.R.attr.maxHeight};
+    private static final int[] ATTRS_LAYOUTPARAMS = new int[]{android.R.attr.layout_gravity, android.R.attr.maxWidth, android.R.attr.maxHeight};
 
     private int mGravity;
     private int mMaxWidth = -1;
@@ -57,7 +60,7 @@ public abstract class BaseViewGroup extends ViewGroup {
 
     private void init(Context context, AttributeSet attrs) {
         if (attrs != null) {
-            TypedArray a = context.obtainStyledAttributes(attrs, ATTRS_MAX_SIZE_GRAVITY);
+            TypedArray a = context.obtainStyledAttributes(attrs, ATTRS_PROPERTIES);
             mGravity = a.getInt(0, mGravity);
             mMaxWidth = a.getDimensionPixelSize(1, mMaxWidth);
             mMaxHeight = a.getDimensionPixelSize(2, mMaxHeight);
@@ -253,8 +256,8 @@ public abstract class BaseViewGroup extends ViewGroup {
         int left = getPaddingLeft(), top = getPaddingTop();
         int right = getPaddingRight(), bottom = getPaddingBottom();
         int selfWidth = r - l, selfHeight = b - t;
-        int contentLeft = getContentStart(left, selfWidth - right, getContentWidth(), mGravity, true);
-        int contentTop = getContentStart(top, selfHeight - bottom, getContentHeight(), mGravity, false);
+        int contentLeft = getContentStartH(left, selfWidth - right, getContentWidth(), mGravity);
+        int contentTop = getContentStartV(top, selfHeight - bottom, getContentHeight(), mGravity);
         dispatchLayout(contentLeft, contentTop, left, top, selfWidth, selfHeight);
         boolean firstAttachLayout = false;
         if (!mAttachLayout) {
@@ -297,20 +300,50 @@ public abstract class BaseViewGroup extends ViewGroup {
         return child == null || child.getVisibility() == View.GONE;
     }
 
-    protected int getContentStart(int containerStart, int containerEnd, int contentWillSize, int contentGravity, boolean horizontalDirection) {
-        int start = containerStart;
-        if (contentGravity != -1) {
-            final int mask = horizontalDirection ? Gravity.HORIZONTAL_GRAVITY_MASK : Gravity.VERTICAL_GRAVITY_MASK;
-            final int maskCenter = horizontalDirection ? Gravity.CENTER_HORIZONTAL : Gravity.CENTER_VERTICAL;
-            final int maskEnd = horizontalDirection ? Gravity.RIGHT : Gravity.BOTTOM;
-            final int okGravity = contentGravity & mask;
-            if (maskCenter == okGravity) {
-                start = containerStart + (containerEnd - containerStart - contentWillSize) / 2;
-            } else if (maskEnd == okGravity) {
-                start = containerEnd - contentWillSize;
+    protected int getContentStartH(int containerLeft, int containerRight, int contentWillSize, int gravity) {
+        return getContentStartH(containerLeft, containerRight, contentWillSize, 0, 0, gravity);
+    }
+
+    protected int getContentStartV(int containerTop, int containerBottom, int contentWillSize, int gravity) {
+        return getContentStartV(containerTop, containerBottom, contentWillSize, 0, 0, gravity);
+    }
+
+    protected int getContentStartH(int containerLeft, int containerRight, int contentWillSize, int contentMarginLeft, int contentMarginRight, int gravity) {
+        if (gravity != -1 || gravity != 0) {
+            int start;
+            final int mask = Gravity.HORIZONTAL_GRAVITY_MASK;
+            final int maskCenter = Gravity.CENTER_HORIZONTAL;
+            final int maskEnd = Gravity.RIGHT;
+            final int okGravity = gravity & mask;
+            if (maskCenter == okGravity) {//center
+                start = containerLeft + (containerRight - containerLeft - (contentWillSize + contentMarginLeft + contentMarginRight)) / 2;
+            } else if (maskEnd == okGravity) {//end
+                start = containerRight - contentWillSize - contentMarginRight;
+            } else {//start
+                start = containerLeft + contentMarginLeft;
             }
+            return start;
         }
-        return start;
+        return containerLeft + contentMarginLeft;
+    }
+
+    protected int getContentStartV(int containerTop, int containerBottom, int contentWillSize, int contentMarginTop, int contentMarginBottom, int gravity) {
+        if (gravity != -1 || gravity != 0) {
+            int start;
+            final int mask = Gravity.VERTICAL_GRAVITY_MASK;
+            final int maskCenter = Gravity.CENTER_VERTICAL;
+            final int maskEnd = Gravity.BOTTOM;
+            final int okGravity = gravity & mask;
+            if (maskCenter == okGravity) {//center
+                start = containerTop + (containerBottom - containerTop - (contentWillSize + contentMarginTop + contentMarginBottom)) / 2;
+            } else if (maskEnd == okGravity) {//end
+                start = containerBottom - contentWillSize - contentMarginBottom;
+            } else {//start
+                start = containerTop + contentMarginTop;
+            }
+            return start;
+        }
+        return containerTop + contentMarginTop;
     }
 
     protected int offsetX(View child, boolean centreInVisibleBounds, boolean marginInclude) {
@@ -456,6 +489,103 @@ public abstract class BaseViewGroup extends ViewGroup {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         mAttachLayout = false;
+    }
+
+    @Override
+    public BaseViewGroup.LayoutParams generateLayoutParams(AttributeSet attrs) {
+        return new BaseViewGroup.LayoutParams(getContext(), attrs);
+    }
+
+    @Override
+    protected BaseViewGroup.LayoutParams generateDefaultLayoutParams() {
+        return new BaseViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    @Override
+    protected BaseViewGroup.LayoutParams generateLayoutParams(ViewGroup.LayoutParams p) {
+        return new BaseViewGroup.LayoutParams(p);
+    }
+
+    @Override
+    protected boolean checkLayoutParams(ViewGroup.LayoutParams p) {
+        return p instanceof BaseViewGroup.LayoutParams;
+    }
+
+    public static class LayoutParams extends MarginLayoutParams {
+        public int gravity = -1;
+        public int maxWidth = -1;
+        public int maxHeight = -1;
+
+        public LayoutParams(Context c, AttributeSet attrs) {
+            super(c, attrs);
+            TypedArray a = c.obtainStyledAttributes(attrs, ATTRS_LAYOUTPARAMS);
+            gravity = a.getInt(0, gravity);
+            maxWidth = a.getDimensionPixelSize(1, maxWidth);
+            maxHeight = a.getDimensionPixelSize(2, maxHeight);
+            a.recycle();
+        }
+
+        public LayoutParams(int width, int height) {
+            super(width, height);
+        }
+
+        public LayoutParams(int width, int height, int gravity) {
+            super(width, height);
+            this.gravity = gravity;
+        }
+
+        public LayoutParams(ViewGroup.LayoutParams source) {
+            super(source);
+        }
+
+        public LayoutParams(ViewGroup.MarginLayoutParams source) {
+            super(source);
+            if (source instanceof BaseViewGroup.LayoutParams) {
+                BaseViewGroup.LayoutParams lp = (BaseViewGroup.LayoutParams) source;
+                gravity = lp.gravity;
+                maxWidth = lp.maxWidth;
+                maxHeight = lp.maxHeight;
+            } else {
+                if (source instanceof LinearLayout.LayoutParams) {
+                    LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) source;
+                    gravity = lp.gravity;
+                }
+                if (source instanceof FrameLayout.LayoutParams) {
+                    FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) source;
+                    gravity = lp.gravity;
+                }
+            }
+        }
+
+        public int getMarginHorizontal() {
+            return leftMargin + rightMargin;
+        }
+
+        public int getMarginVertical() {
+            return topMargin + bottomMargin;
+        }
+
+        public void measure(View child, int childWidthMeasureSpec,  int childHeightMeasureSpec){
+            if(maxWidth>0){
+                childWidthMeasureSpec=getLimitMeasureSpec(childWidthMeasureSpec,maxWidth);
+            }
+            if(maxHeight>0){
+                childHeightMeasureSpec=getLimitMeasureSpec(childHeightMeasureSpec,maxHeight);
+            }
+            child.measure(childWidthMeasureSpec,childHeightMeasureSpec);
+        }
+
+        private int getLimitMeasureSpec(int measureSpec,int maxSize){
+            int size=MeasureSpec.getSize(measureSpec);
+            int mode=MeasureSpec.getMode(measureSpec);
+            if(size>maxSize){
+                size=maxSize;
+            }
+            if(mode==MeasureSpec.UNSPECIFIED){
+                mode=MeasureSpec.AT_MOST;
+            }
+            return MeasureSpec.makeMeasureSpec(size,mode);
+        }
     }
 
     public interface OnScrollChangeListener {

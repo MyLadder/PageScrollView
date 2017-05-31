@@ -441,8 +441,8 @@ public class PageScrollView extends BaseViewGroup {
     protected int translateMeasure(int spec, int padding, boolean limitedSize) {
         int specMode = MeasureSpec.getMode(spec);
         int specSize = MeasureSpec.getSize(spec);
-        int size = limitedSize ? Math.max(0, specSize - padding) : Integer.MAX_VALUE;
-        return MeasureSpec.makeMeasureSpec(size, specMode);
+        int size = Math.max(0, specSize - padding);
+        return MeasureSpec.makeMeasureSpec(size, limitedSize ? specMode : MeasureSpec.UNSPECIFIED);
     }
 
     protected void measureFloatViewIfNeed(int virtualCount) {
@@ -537,7 +537,7 @@ public class PageScrollView extends BaseViewGroup {
                 if (params.width == -1) {
                     extraMeasureWidthSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(extraMeasureWidthSpec), MeasureSpec.EXACTLY);
                 }
-                view.measure(extraMeasureWidthSpec, extraMeasureHeightSpec);
+                params.measure(view, extraMeasureWidthSpec, extraMeasureHeightSpec);
                 int contentHeight = view.getMeasuredHeight() + childMarginVertical;
                 mContentWidth = Math.max(mContentWidth, view.getMeasuredWidth() + childMarginHorizontal);
                 if (contentHeight > 0) {
@@ -547,7 +547,7 @@ public class PageScrollView extends BaseViewGroup {
                 if (params.height == -1) {
                     extraMeasureHeightSpec = MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(extraMeasureHeightSpec), MeasureSpec.EXACTLY);
                 }
-                view.measure(extraMeasureWidthSpec, extraMeasureHeightSpec);
+                params.measure(view, extraMeasureWidthSpec, extraMeasureHeightSpec);
                 int contentWidth = view.getMeasuredWidth() + childMarginHorizontal;
                 if (contentWidth > 0) {
                     mContentWidth += contentWidth;
@@ -576,7 +576,7 @@ public class PageScrollView extends BaseViewGroup {
             int childMarginVertical = params.getMarginVertical();
             int childWidthSpec = getMiddleChildMeasureSpec(widthMeasureSpec, 0, childMarginHorizontal, params.width);
             int childHeightSpec = childFixedHeightSpec == 0 ? getMiddleChildMeasureSpec(heightMeasureSpec, parentRealSize, childMarginVertical, params.height) : childFixedHeightSpec;
-            child.measure(childWidthSpec, childHeightSpec);
+            params.measure(child, childWidthSpec, childHeightSpec);
             if (mMiddleMargin > 0 && measuredCount > 0) {
                 contentHeight += mMiddleMargin;
             }
@@ -608,7 +608,7 @@ public class PageScrollView extends BaseViewGroup {
             int childMarginVertical = params.getMarginVertical();
             int childWidthSpec = childFixedWidthSpec == 0 ? getMiddleChildMeasureSpec(widthMeasureSpec, parentRealSize, childMarginHorizontal, params.width) : childFixedWidthSpec;
             int childHeightSpec = getMiddleChildMeasureSpec(heightMeasureSpec, 0, childMarginVertical, params.height);
-            child.measure(childWidthSpec, childHeightSpec);
+            params.measure(child, childWidthSpec, childHeightSpec);
             if (mMiddleMargin > 0 && measuredCount > 0) {
                 contentWidth += mMiddleMargin;
             }
@@ -770,11 +770,11 @@ public class PageScrollView extends BaseViewGroup {
     }
 
     @Override
-    protected void dispatchLayout(int contentleft, int contentTop, int paddingLeft, int paddingTop, int selfWidth, int selfHeight) {
+    protected void dispatchLayout(int contentLeft, int contentTop, int paddingLeft, int paddingTop, int selfWidth, int selfHeight) {
         if (mOrientation == HORIZONTAL) {
-            onLayoutHorizontal(Math.max(contentleft, paddingLeft), contentTop, selfWidth - paddingLeft - getPaddingRight());
+            onLayoutHorizontal(Math.max(contentLeft, paddingLeft), contentTop, selfWidth - paddingLeft - getPaddingRight());
         } else {
-            onLayoutVertical(contentleft, Math.max(contentTop, paddingTop), selfHeight - paddingTop - getPaddingBottom());
+            onLayoutVertical(contentLeft, Math.max(contentTop, paddingTop), selfHeight - paddingTop - getPaddingBottom());
         }
     }
 
@@ -811,7 +811,7 @@ public class PageScrollView extends BaseViewGroup {
             PageScrollView.LayoutParams params = (PageScrollView.LayoutParams) child.getLayoutParams();
             childTop += params.topMargin;
             childBottom = childTop + child.getMeasuredHeight();
-            childLeft = getContentStart(baseLeft, baseRight, child.getMeasuredWidth() + params.getMarginHorizontal(), isChildCenter ? Gravity.CENTER : params.gravity, true);
+            childLeft = getContentStartH(baseLeft, baseRight, child.getMeasuredWidth(), params.leftMargin, params.rightMargin, isChildCenter ? Gravity.CENTER : params.gravity);
             childRight = childLeft + child.getMeasuredWidth();
             child.layout(childLeft, childTop, childRight, childBottom);
             childTop = childBottom + params.bottomMargin;
@@ -854,7 +854,7 @@ public class PageScrollView extends BaseViewGroup {
             PageScrollView.LayoutParams params = (PageScrollView.LayoutParams) child.getLayoutParams();
             childLeft += params.leftMargin;
             childRight = childLeft + child.getMeasuredWidth();
-            childTop = getContentStart(baseTop, baseBottom, child.getMeasuredHeight() + params.getMarginVertical(), isChildCenter ? Gravity.CENTER : params.gravity, false);
+            childTop = getContentStartV(baseTop, baseBottom, child.getMeasuredHeight(), params.topMargin, params.bottomMargin, isChildCenter ? Gravity.CENTER : params.gravity);
             childBottom = childTop + child.getMeasuredHeight();
             child.layout(childLeft, childTop, childRight, childBottom);
             childLeft = childRight + params.rightMargin;
@@ -1586,70 +1586,6 @@ public class PageScrollView extends BaseViewGroup {
             childDimension = parentSize;
         }
         return getChildMeasureSpec(spec, padding, childDimension);
-    }
-
-    @Override
-    public PageScrollView.LayoutParams generateLayoutParams(AttributeSet attrs) {
-        return new PageScrollView.LayoutParams(getContext(), attrs);
-    }
-
-    @Override
-    protected PageScrollView.LayoutParams generateDefaultLayoutParams() {
-        return new PageScrollView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-    }
-
-    @Override
-    protected PageScrollView.LayoutParams generateLayoutParams(ViewGroup.LayoutParams p) {
-        return new PageScrollView.LayoutParams(p);
-    }
-
-    @Override
-    protected boolean checkLayoutParams(ViewGroup.LayoutParams p) {
-        return p instanceof PageScrollView.LayoutParams;
-    }
-
-    public static class LayoutParams extends MarginLayoutParams {
-        public int gravity = -1;
-
-        public LayoutParams(Context c, AttributeSet attrs) {
-            super(c, attrs);
-            TypedArray a = c.obtainStyledAttributes(attrs, R.styleable.PageScrollView);
-            gravity = a.getInt(R.styleable.PageScrollView_android_layout_gravity, -1);
-            a.recycle();
-        }
-
-        public LayoutParams(int width, int height) {
-            super(width, height);
-        }
-
-        public LayoutParams(int width, int height, int gravity) {
-            super(width, height);
-            this.gravity = gravity;
-        }
-
-        public LayoutParams(ViewGroup.LayoutParams source) {
-            super(source);
-        }
-
-        public LayoutParams(ViewGroup.MarginLayoutParams source) {
-            super(source);
-            if (source instanceof LinearLayout.LayoutParams) {
-                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) source;
-                gravity = lp.gravity;
-            }
-            if (source instanceof PageScrollView.LayoutParams) {
-                PageScrollView.LayoutParams lp = (PageScrollView.LayoutParams) source;
-                gravity = lp.gravity;
-            }
-        }
-
-        public int getMarginHorizontal() {
-            return leftMargin + rightMargin;
-        }
-
-        public int getMarginVertical() {
-            return topMargin + bottomMargin;
-        }
     }
 
     public interface PageTransformer {

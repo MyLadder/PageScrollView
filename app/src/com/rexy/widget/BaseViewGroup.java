@@ -14,6 +14,16 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 /**
+ * 支持容器内容自身的gravity,maxWidth,maxHeight.
+ * 支持直接子 View 的 layout_gravity,maxWidth,maxHeight 等。
+ * 支持水平和垂直视图的滑动计算 Api 和滑动事件。
+ * 随时可监听当前视图可见区域的变法。
+ * onMeasure 和 onLayout 内部做了一定的通用处理，不可重载，可打印他们执行的结果和耗费时间。
+ * <p>
+ * <p>
+ * 实现子类需要重写dispatchMeasure和dispatchLayout 两个方法。
+ * 其中dispatchMeasure来实现child 的测量，最终需要调用setContentSize 方法。
+ *
  * @author: renzheng
  * @date: 2017-04-25 09:32
  */
@@ -222,14 +232,35 @@ public abstract class BaseViewGroup extends ViewGroup {
         }
     }
 
+    private int getMeasureSize(int minSize, int maxSize, int contentSize, int padding) {
+        int finalSize = Math.max(minSize, contentSize + padding);
+        if (maxSize > minSize && maxSize > 0 && finalSize > maxSize) {
+            finalSize = maxSize;
+        }
+        return finalSize;
+    }
+
+    private int getMeasureSizeWithoutPadding(int minSize, int maxSize, int measureSpec, int padding) {
+        int finalSize = MeasureSpec.getSize(measureSpec);
+        if (minSize > finalSize) {
+            finalSize = minSize;
+        }
+        if (finalSize > maxSize && maxSize > minSize && maxSize > 0) {
+            finalSize = maxSize;
+        }
+        return Math.max(finalSize - padding, 0);
+    }
+
     @Override
     protected final void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         mTimeMeasureStart = System.currentTimeMillis();
         mContentSizeState[0] = mContentSizeState[1] = mContentSizeState[2] = 0;
+        final int minWidth = getSuggestedMinimumWidth();
+        final int minHeight = getSuggestedMinimumHeight();
         final int paddingHorizontal = getPaddingLeft() + getPaddingRight();
         final int paddingVertical = getPaddingTop() + getPaddingBottom();
-        final int mostWidthNoPadding = Math.max(MeasureSpec.getSize(widthMeasureSpec) - paddingHorizontal, 0);
-        final int mostHeightNoPadding = Math.max(MeasureSpec.getSize(heightMeasureSpec) - paddingVertical, 0);
+        final int mostWidthNoPadding = getMeasureSizeWithoutPadding(minWidth, mMaxWidth, widthMeasureSpec, paddingHorizontal);
+        final int mostHeightNoPadding = getMeasureSizeWithoutPadding(minHeight, mMaxHeight, heightMeasureSpec, paddingVertical);
         dispatchMeasure(
                 MeasureSpec.makeMeasureSpec(mostWidthNoPadding, MeasureSpec.getMode(widthMeasureSpec)),
                 MeasureSpec.makeMeasureSpec(mostHeightNoPadding, MeasureSpec.getMode(heightMeasureSpec)),
@@ -237,34 +268,29 @@ public abstract class BaseViewGroup extends ViewGroup {
                 mostHeightNoPadding
         );
         int contentWidth = mContentSizeState[0], contentHeight = mContentSizeState[1], childState = mContentSizeState[2];
-        int maxWidth = Math.max(contentWidth + paddingHorizontal, getSuggestedMinimumWidth());
-        int maxHeight = Math.max(contentHeight + paddingVertical, getSuggestedMinimumHeight());
-        if (mMaxWidth > 0 && maxWidth > mMaxWidth) {
-            maxWidth = mMaxWidth;
-        }
-        if (mMaxHeight > 0 && maxHeight > mMaxHeight) {
-            maxHeight = mMaxHeight;
-        }
-        setMeasuredDimension(resolveSizeAndState(maxWidth, widthMeasureSpec, childState),
-                resolveSizeAndState(maxHeight, heightMeasureSpec, childState << MEASURED_HEIGHT_STATE_SHIFT));
+        int finalWidth = getMeasureSize(minWidth, mMaxWidth, contentWidth, paddingHorizontal);
+        int finalHeight = getMeasureSize(minHeight, mMaxHeight, contentHeight, paddingVertical);
+        setMeasuredDimension(resolveSizeAndState(finalWidth, widthMeasureSpec, childState),
+                resolveSizeAndState(finalHeight, heightMeasureSpec, childState << MEASURED_HEIGHT_STATE_SHIFT));
         doAfterMeasure(getMeasuredWidth(), getMeasuredHeight(), contentWidth, contentHeight);
     }
 
     @Override
     protected final void onLayout(boolean changed, int l, int t, int r, int b) {
         mTimeLayoutStart = System.currentTimeMillis();
-        int left = getPaddingLeft(), top = getPaddingTop();
-        int right = getPaddingRight(), bottom = getPaddingBottom();
-        int selfWidth = r - l, selfHeight = b - t;
-        int contentLeft = getContentStartH(left, selfWidth - right, getContentWidth(), mGravity);
-        int contentTop = getContentStartV(top, selfHeight - bottom, getContentHeight(), mGravity);
-        dispatchLayout(contentLeft, contentTop, left, top, selfWidth, selfHeight);
         boolean firstAttachLayout = false;
         if (!mAttachLayout) {
             firstAttachLayout = mAttachLayout = true;
             int scrollX = getScrollX(), scrollY = getScrollY();
             computeVisibleBounds(scrollX, scrollY, false);
         }
+        int left = getPaddingLeft(), top = getPaddingTop();
+        int right = getPaddingRight(), bottom = getPaddingBottom();
+        int selfWidthNoPadding = r - l - left - right;
+        int selfHeightNoPadding = b - t - top - bottom;
+        int contentLeft = getContentStartH(left, selfWidthNoPadding + left, getContentWidth(), mGravity);
+        int contentTop = getContentStartV(top, selfHeightNoPadding + top, getContentHeight(), mGravity);
+        dispatchLayout(contentLeft, contentTop, left, top, selfWidthNoPadding, selfHeightNoPadding);
         doAfterLayout(firstAttachLayout);
     }
 
@@ -284,7 +310,7 @@ public abstract class BaseViewGroup extends ViewGroup {
         }
     }
 
-    protected abstract void dispatchLayout(int contentleft, int contentTop, int paddingLeft, int paddingTop, int selfWidth, int selfHeight);
+    protected abstract void dispatchLayout(int contentLeft, int contentTop, int paddingLeft, int paddingTop, int selfWidthNoPadding, int selfHeightNoPadding);
 
     protected void doAfterLayout(boolean firstAttachLayout) {
         if (isLogAccess()) {
@@ -298,6 +324,14 @@ public abstract class BaseViewGroup extends ViewGroup {
 
     protected boolean skipChild(View child) {
         return child == null || child.getVisibility() == View.GONE;
+    }
+
+    protected int getContentLeft() {
+        return getContentStartH(getPaddingLeft(), getWidth() - getPaddingRight(), getContentWidth(), mGravity);
+    }
+
+    protected int getContentTop() {
+        return getContentStartH(getPaddingTop(), getHeight() - getPaddingBottom(), getContentHeight(), mGravity);
     }
 
     protected int getContentStartH(int containerLeft, int containerRight, int contentWillSize, int gravity) {
@@ -316,7 +350,7 @@ public abstract class BaseViewGroup extends ViewGroup {
             final int maskEnd = Gravity.RIGHT;
             final int okGravity = gravity & mask;
             if (maskCenter == okGravity) {//center
-                start = containerLeft + (containerRight - containerLeft - (contentWillSize + contentMarginLeft + contentMarginRight)) / 2;
+                start = containerLeft + contentMarginLeft + (containerRight - containerLeft - (contentWillSize + contentMarginLeft + contentMarginRight)) / 2;
             } else if (maskEnd == okGravity) {//end
                 start = containerRight - contentWillSize - contentMarginRight;
             } else {//start
@@ -565,26 +599,32 @@ public abstract class BaseViewGroup extends ViewGroup {
             return topMargin + bottomMargin;
         }
 
-        public void measure(View child, int childWidthMeasureSpec,  int childHeightMeasureSpec){
-            if(maxWidth>0){
-                childWidthMeasureSpec=getLimitMeasureSpec(childWidthMeasureSpec,maxWidth);
+        public void measure(View child, int childWidthMeasureSpec, int childHeightMeasureSpec) {
+            if (maxWidth > 0) {
+                childWidthMeasureSpec = getLimitMeasureSpec(childWidthMeasureSpec, maxWidth);
             }
-            if(maxHeight>0){
-                childHeightMeasureSpec=getLimitMeasureSpec(childHeightMeasureSpec,maxHeight);
+            if (maxHeight > 0) {
+                childHeightMeasureSpec = getLimitMeasureSpec(childHeightMeasureSpec, maxHeight);
             }
-            child.measure(childWidthMeasureSpec,childHeightMeasureSpec);
+            child.measure(childWidthMeasureSpec, childHeightMeasureSpec);
         }
 
-        private int getLimitMeasureSpec(int measureSpec,int maxSize){
-            int size=MeasureSpec.getSize(measureSpec);
-            int mode=MeasureSpec.getMode(measureSpec);
-            if(size>maxSize){
-                size=maxSize;
+        public void measure(View view, int parentWidthMeasureSpec, int parentHeightMeasureSpec, int widthUsed, int heightUsed) {
+            measure(view
+                    , BaseViewGroup.getChildMeasureSpec(parentWidthMeasureSpec, widthUsed, width)
+                    , BaseViewGroup.getChildMeasureSpec(parentHeightMeasureSpec, heightUsed, height));
+        }
+
+        private int getLimitMeasureSpec(int measureSpec, int maxSize) {
+            int size = MeasureSpec.getSize(measureSpec);
+            int mode = MeasureSpec.getMode(measureSpec);
+            if (size > maxSize) {
+                size = maxSize;
             }
-            if(mode==MeasureSpec.UNSPECIFIED){
-                mode=MeasureSpec.AT_MOST;
+            if (mode == MeasureSpec.UNSPECIFIED) {
+                mode = MeasureSpec.AT_MOST;
             }
-            return MeasureSpec.makeMeasureSpec(size,mode);
+            return MeasureSpec.makeMeasureSpec(size, mode);
         }
     }
 

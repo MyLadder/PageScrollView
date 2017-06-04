@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-
 /**
  * A customized scroll container support both Horizontal and Vertical layout and gesture.
  * support both scroll style of ScrollView and ViewPager and also their interfaces .
@@ -770,11 +769,11 @@ public class PageScrollView extends BaseViewGroup {
     }
 
     @Override
-    protected void dispatchLayout(int contentLeft, int contentTop, int paddingLeft, int paddingTop, int selfWidth, int selfHeight) {
+    protected void dispatchLayout(int contentLeft, int contentTop, int paddingLeft, int paddingTop, int selfWidthNoPadding, int selfHeightNoPadding) {
         if (mOrientation == HORIZONTAL) {
-            onLayoutHorizontal(Math.max(contentLeft, paddingLeft), contentTop, selfWidth - paddingLeft - getPaddingRight());
+            onLayoutHorizontal(Math.max(contentLeft, paddingLeft), contentTop, selfWidthNoPadding);
         } else {
-            onLayoutVertical(contentLeft, Math.max(contentTop, paddingTop), selfHeight - paddingTop - getPaddingBottom());
+            onLayoutVertical(contentLeft, Math.max(contentTop, paddingTop), selfHeightNoPadding);
         }
     }
 

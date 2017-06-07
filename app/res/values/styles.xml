@@ -3,4 +3,15 @@
     <style name="AppTheme" parent="android:Theme.Holo">
         <!-- Customize your theme here. -->
     </style>
+
+    <style name="Activity_Welcome" parent="@android:style/Theme">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@drawable/layer_bk_welcome</item>
+        <item name="android:windowIsTranslucent">false</item>
+    </style>
+
+    <style name="Activity_Main" parent="android:Theme.Holo">
+        <item name="android:windowBackground">@color/window_background_color</item>
+        <item name="android:windowIsTranslucent">false</item>
+    </style>
 </resources>

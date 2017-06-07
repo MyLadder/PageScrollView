@@ -24,7 +24,7 @@ import android.widget.LinearLayout;
  * 实现子类需要重写dispatchMeasure和dispatchLayout 两个方法。
  * 其中dispatchMeasure来实现child 的测量，最终需要调用setContentSize 方法。
  *
- * @author: renzheng
+ * @author: rexy
  * @date: 2017-04-25 09:32
  */
 public abstract class BaseViewGroup extends ViewGroup {
@@ -38,8 +38,10 @@ public abstract class BaseViewGroup extends ViewGroup {
     private int mGravity;
     private int mMaxWidth = -1;
     private int mMaxHeight = -1;
+    private int mContentWidth = 0;
+    private int mContentHeight = 0;
+    private int mChildMeasureState = 0;
     protected Rect mVisibleBounds = new Rect();
-    private int[] mContentSizeState = new int[]{0, 0, 0};
     private OnScrollChangeListener mScrollListener;
 
     protected int mScrollState = SCROLL_STATE_IDLE;
@@ -93,24 +95,24 @@ public abstract class BaseViewGroup extends ViewGroup {
     }
 
     public int getContentWidth() {
-        return mContentSizeState[0];
+        return mContentWidth;
     }
 
     public int getContentHeight() {
-        return mContentSizeState[1];
+        return mContentHeight;
     }
 
     public int getMeasureState() {
-        return mContentSizeState[2];
+        return mChildMeasureState;
     }
 
     protected void setContentSize(int contentWidth, int contentHeight) {
-        mContentSizeState[0] = contentWidth;
-        mContentSizeState[1] = contentHeight;
+        mContentWidth = contentWidth;
+        mContentHeight = contentHeight;
     }
 
     protected void setMeasureState(int childMeasureState) {
-        mContentSizeState[2] = childMeasureState;
+        mChildMeasureState = childMeasureState;
     }
 
     public int getGravity() {
@@ -254,7 +256,7 @@ public abstract class BaseViewGroup extends ViewGroup {
     @Override
     protected final void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         mTimeMeasureStart = System.currentTimeMillis();
-        mContentSizeState[0] = mContentSizeState[1] = mContentSizeState[2] = 0;
+        mContentWidth = mContentHeight = mChildMeasureState = 0;
         final int minWidth = getSuggestedMinimumWidth();
         final int minHeight = getSuggestedMinimumHeight();
         final int paddingHorizontal = getPaddingLeft() + getPaddingRight();
@@ -267,7 +269,7 @@ public abstract class BaseViewGroup extends ViewGroup {
                 mostWidthNoPadding,
                 mostHeightNoPadding
         );
-        int contentWidth = mContentSizeState[0], contentHeight = mContentSizeState[1], childState = mContentSizeState[2];
+        int contentWidth = mContentWidth, contentHeight = mContentHeight, childState = mChildMeasureState;
         int finalWidth = getMeasureSize(minWidth, mMaxWidth, contentWidth, paddingHorizontal);
         int finalHeight = getMeasureSize(minHeight, mMaxHeight, contentHeight, paddingVertical);
         setMeasuredDimension(resolveSizeAndState(finalWidth, widthMeasureSpec, childState),
@@ -350,7 +352,7 @@ public abstract class BaseViewGroup extends ViewGroup {
             final int maskEnd = Gravity.RIGHT;
             final int okGravity = gravity & mask;
             if (maskCenter == okGravity) {//center
-                start = containerLeft + contentMarginLeft + (containerRight - containerLeft - (contentWillSize + contentMarginLeft + contentMarginRight)) / 2;
+                start = containerLeft + (containerRight - containerLeft - (contentWillSize + contentMarginRight - contentMarginLeft)) / 2;
             } else if (maskEnd == okGravity) {//end
                 start = containerRight - contentWillSize - contentMarginRight;
             } else {//start
@@ -369,7 +371,7 @@ public abstract class BaseViewGroup extends ViewGroup {
             final int maskEnd = Gravity.BOTTOM;
             final int okGravity = gravity & mask;
             if (maskCenter == okGravity) {//center
-                start = containerTop + (containerBottom - containerTop - (contentWillSize + contentMarginTop + contentMarginBottom)) / 2;
+                start = containerTop + (containerBottom - containerTop - (contentWillSize + contentMarginBottom - contentMarginTop)) / 2;
             } else if (maskEnd == okGravity) {//end
                 start = containerBottom - contentWillSize - contentMarginBottom;
             } else {//start
@@ -572,7 +574,7 @@ public abstract class BaseViewGroup extends ViewGroup {
             super(source);
         }
 
-        public LayoutParams(ViewGroup.MarginLayoutParams source) {
+        public LayoutParams(MarginLayoutParams source) {
             super(source);
             if (source instanceof BaseViewGroup.LayoutParams) {
                 BaseViewGroup.LayoutParams lp = (BaseViewGroup.LayoutParams) source;

@@ -26,12 +26,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+
 /**
  * A customized scroll container support both Horizontal and Vertical layout and gesture.
  * support both scroll style of ScrollView and ViewPager and also their interfaces .
  * support float any view to its start and end position .
  *
- * @author: renzheng
+ * @author: rexy
  * @date: 2017-04-25 09:32
  */
 public class PageScrollView extends BaseViewGroup {
@@ -1370,14 +1371,15 @@ public class PageScrollView extends BaseViewGroup {
     private void updatePositionForFloatView(int scrolled, boolean horizontal) {
         float viewTranslated;
         int wantTranslated;
+        //TODO FLOAT MARGIN SHOULD MAKE AS A ATTRIBUTION.
         if (mFloatViewStartMode == FLOAT_VIEW_SCROLL) {
             View view = getItemView(mFloatViewStartIndex);
             PageScrollView.LayoutParams params = (LayoutParams) view.getLayoutParams();
             if (horizontal) {
-                wantTranslated = scrolled - (view.getLeft() + params.leftMargin);
+                wantTranslated = scrolled - view.getLeft();
                 viewTranslated = view.getTranslationX();
             } else {
-                wantTranslated = scrolled - (view.getTop() + params.topMargin);
+                wantTranslated = scrolled - view.getTop();
                 viewTranslated = view.getTranslationY();
             }
             wantTranslated = Math.max(0, wantTranslated);
@@ -1395,11 +1397,11 @@ public class PageScrollView extends BaseViewGroup {
             int scrollRange;
             if (horizontal) {
                 scrollRange = getHorizontalScrollRange();
-                wantTranslated = scrolled - scrollRange + (getContentWidth() - (view.getRight() + params.rightMargin));
+                wantTranslated = scrolled - scrollRange + (getContentWidth() - view.getRight());
                 viewTranslated = view.getTranslationX();
             } else {
                 scrollRange = getVerticalScrollRange();
-                wantTranslated = scrolled - scrollRange + (getContentHeight() - (view.getBottom() + params.bottomMargin));
+                wantTranslated = scrolled - scrollRange + (getContentHeight() - view.getBottom());
                 viewTranslated = view.getTranslationY();
             }
             wantTranslated = Math.min(0, wantTranslated);

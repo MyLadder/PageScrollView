@@ -110,7 +110,7 @@ public class PageScrollTab extends PageScrollView {
 
     protected ItemProvider mITabProvider = null;
     protected ITabClickEvent mTabClick = null;
-    private OnClickListener mTabItemClick = new OnClickListener() {
+    private View.OnClickListener mTabItemClick = new View.OnClickListener() {
         @Override
         public void onClick(View view) {
             Object tag = view.getTag(TAB_INDEX);
@@ -781,7 +781,7 @@ public class PageScrollTab extends PageScrollView {
         return savedState;
     }
 
-    static class SavedState extends BaseSavedState {
+    static class SavedState extends View.BaseSavedState {
         int currentPosition;
 
         public SavedState(Parcelable superState) {

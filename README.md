@@ -1,7 +1,7 @@
 PageScrollView
 ==============
 
-PageScrollView widget that is a customized ViewGroup having function like `ScrollView` & `ViewPager` .
+>PageScrollView widget that is a customized ViewGroup having function like `ScrollView` & `ViewPager` .***for more amusing customized ViewGroup please visit [WidgetLayout][3]***
 
 **the sample using interaction image,both use a simple PageScrollView without nest another ViewGroup:**
 
@@ -191,3 +191,4 @@ More powerful expand PageScrollTab extends PageScrollView
  [viewpager]:image/example_type_viewpager.gif  "viewpager type but not support PageAdapter"
  [1]:app/src/com/rexy/example/ExampleActivity.java "activity entry"
  [2]:image/PageScrollView.apk  "demo apk to download"
+ [3]:https://github.com/rexyren/WidgetLayout

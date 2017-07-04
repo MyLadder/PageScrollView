@@ -539,6 +539,9 @@ public abstract class BaseViewGroup extends ViewGroup {
 
     @Override
     protected BaseViewGroup.LayoutParams generateLayoutParams(ViewGroup.LayoutParams p) {
+        if (p instanceof MarginLayoutParams) {
+            return new BaseViewGroup.LayoutParams((MarginLayoutParams) p);
+        }
         return new BaseViewGroup.LayoutParams(p);
     }
 

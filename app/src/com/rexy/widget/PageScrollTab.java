@@ -16,7 +16,6 @@ import android.util.DisplayMetrics;
 import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.view.animation.Animation;
@@ -41,7 +40,6 @@ public class PageScrollTab extends PageScrollView {
      */
     private int mCurrentPosition = 0; //当前选中的tab 索引。
     private float mCurrentPositionOffset = 0f;//选中tab 的偏移量子。
-
 
 
     /**
@@ -233,8 +231,8 @@ public class PageScrollTab extends PageScrollView {
         if (mLocalInfo == null) {
             mLocalInfo = getResources().getConfiguration().locale;
         }
-        mItemLayoutParams=new PageScrollView.LayoutParams(-2,-2,Gravity.CENTER_VERTICAL);
-        setGravity(Gravity.CENTER_VERTICAL|getGravity());
+        mItemLayoutParams = new PageScrollView.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL);
+        setGravity(Gravity.CENTER_VERTICAL | getGravity());
         setIndicatorWidthPercent(atrIndicatorWidthPercent);
     }
 
@@ -297,7 +295,7 @@ public class PageScrollTab extends PageScrollView {
         }
         for (int i = 0; i < tabItemCount; i++) {
             if (isViewTab) {
-                addTab(i, ((ItemProvider.ViewProvider) mITabProvider).getView(i,null,PageScrollTab.this));
+                addTab(i, ((ItemProvider.ViewProvider) mITabProvider).getView(i, null, PageScrollTab.this));
             } else {
                 CharSequence label = accessToTabProvider ? (mITabProvider.getTitle(i)) : (mViewPager.getAdapter().getPageTitle(i));
                 addTextTab(i, label);
@@ -349,7 +347,11 @@ public class PageScrollTab extends PageScrollView {
         int right = Math.max(mItemMinPaddingHorizontal, tab.getPaddingRight());
         int bottom = Math.max(mItemMinPaddingBottom, tab.getPaddingBottom());
         tab.setPadding(left, top, right, bottom);
-        addView(tab, position,mItemLayoutParams);
+        if (tab.getLayoutParams() == null) {
+            addView(tab, position, mItemLayoutParams);
+        } else {
+            addView(tab, position);
+        }
     }
 
     public void addTabItem(CharSequence title, boolean updateStyle) {
@@ -415,7 +417,7 @@ public class PageScrollTab extends PageScrollView {
         if (isInEditMode() || itemCount == 0) {
             return;
         }
-        int width = getWidth(),height = getHeight();
+        int width = getWidth(), height = getHeight(), scrollX = getScrollX();
 
         // draw divider
         if (mDividerWidth > 0) {
@@ -431,11 +433,11 @@ public class PageScrollTab extends PageScrollView {
         // draw top or bottom line.
         if (mBottomLineHeight > 0) {
             mRectPaint.setColor(mBottomLineColor);
-            canvas.drawRect(0, height - mBottomLineHeight, width, height, mRectPaint);
+            canvas.drawRect(scrollX, height - mBottomLineHeight, width + scrollX, height, mRectPaint);
         }
         if (mTopLineHeight > 0) {
             mRectPaint.setColor(mTopLineColor);
-            canvas.drawRect(0, 0, width, mTopLineHeight, mRectPaint);
+            canvas.drawRect(scrollX, 0, width + scrollX, mTopLineHeight, mRectPaint);
         }
 
         // draw indicator line
@@ -565,7 +567,7 @@ public class PageScrollTab extends PageScrollView {
 
     public View getSelectedView() {
         if (mCurrentPosition >= 0 && mCurrentPosition < getTabItemCount()) {
-            return getVirtualChildAt(mCurrentPosition,true);
+            return getVirtualChildAt(mCurrentPosition, true);
         }
         return null;
     }
@@ -823,6 +825,7 @@ public class PageScrollTab extends PageScrollView {
             mScrollFrom = from;
             mScrollTo = to;
         }
+
         @Override
         protected void applyTransformation(float time, Transformation t) {
             int current = (int) (mScrollFrom + (mScrollTo - mScrollFrom) * time);
